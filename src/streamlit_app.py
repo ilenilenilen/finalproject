@@ -1,40 +1,33 @@
-import altair as alt
 import numpy as np
 import pandas as pd
 import streamlit as st
+import joblib
+import os
 
-"""
-# Welcome to Streamlit!
 
-Edit `/streamlit_app.py` to customize this app to your heart's desire :heart:.
-If you have any questions, checkout our [documentation](https://docs.streamlit.io) and [community
-forums](https://discuss.streamlit.io).
+# Path yang benar: gunakan direktori saat ini (tempat streamlit_app.py berada)
+MODEL_DIR = os.path.dirname(os.path.abspath(__file__))
 
-In the meantime, below is an example of what you can do with just a few lines of code:
-"""
+@st.cache_resource
+def load_models():
+    return {
+        "Logistic Regression": joblib.load(os.path.join(MODEL_DIR, "lr_model.pkl")),
+        "Naive Bayes": joblib.load(os.path.join(MODEL_DIR, "nb_model.pkl")),
+        "Ensemble" :joblib.load(os.path.join(MODEL_DIR, "ensemble_model.pkl")),
+        "SVM": joblib.load(os.path.join(MODEL_DIR, "svm_model.pkl")),
+    }
 
-num_points = st.slider("Number of points in spiral", 1, 10000, 1100)
-num_turns = st.slider("Number of turns in spiral", 1, 300, 31)
 
-indices = np.linspace(0, 1, num_points)
-theta = 2 * np.pi * num_turns * indices
-radius = indices
+models = load_models()
 
-x = radius * np.cos(theta)
-y = radius * np.sin(theta)
+st.title("Text Classification App")
+text = st.text_area("Enter some text:")
+model_choice = st.selectbox("Choose a model:", list(models.keys()))
 
-df = pd.DataFrame({
-    "x": x,
-    "y": y,
-    "idx": indices,
-    "rand": np.random.randn(num_points),
-})
-
-st.altair_chart(alt.Chart(df, height=700, width=700)
-    .mark_point(filled=True)
-    .encode(
-        x=alt.X("x", axis=None),
-        y=alt.Y("y", axis=None),
-        color=alt.Color("idx", legend=None, scale=alt.Scale()),
-        size=alt.Size("rand", legend=None, scale=alt.Scale(range=[1, 150])),
-    ))
+if st.button("Predict"):
+    if not text.strip():
+        st.warning("Please enter some text.")
+    else:
+        model = models[model_choice]
+        prediction = model.predict([text])[0]
+        st.success(f"Prediction: {prediction}")
