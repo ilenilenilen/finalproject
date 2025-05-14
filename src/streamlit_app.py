@@ -4,8 +4,6 @@ import streamlit as st
 import joblib
 import os
 
-
-# Path yang benar: gunakan direktori saat ini (tempat streamlit_app.py berada)
 MODEL_DIR = os.path.dirname(os.path.abspath(__file__))
 
 @st.cache_resource
