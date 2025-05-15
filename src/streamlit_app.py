@@ -60,11 +60,15 @@ uploaded_file = st.file_uploader("Upload your CV (PDF format only):", type=["pdf
 cv_text = ""  # initialize variable here so it is always defined
 
 if uploaded_file is not None:
-    cv_text = extract_text_from_pdf(uploaded_file)
-    if cv_text.strip():
-        st.text_area("Extracted Text:", cv_text, height=200)
-    else:
-        st.error("Unable to extract text from the uploaded file.")
+    try:
+        with uploaded_file:
+            cv_text = extract_text_from_pdf(uploaded_file)
+        if cv_text.strip():
+            st.text_area("Extracted Text:", cv_text, height=200)
+        else:
+            st.error("No text could be extracted from the uploaded file.")
+    except Exception as e:
+        st.error(f"Error processing file: {e}")
 
 # Categorization and Display
 if cv_text.strip():
