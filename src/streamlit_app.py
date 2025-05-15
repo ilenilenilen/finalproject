@@ -52,14 +52,10 @@ st.title("CV Parsing and Text Classification App")
 # Upload CV File
 uploaded_file = st.file_uploader("Upload your CV (PDF format only):", type=["pdf"])
 
-cv_text = ""
 if uploaded_file is not None:
-    # Extract text from uploaded file
-    cv_text = extract_text_from_pdf(uploaded_file)
-    if cv_text.strip():
-        st.text_area("Extracted Text:", cv_text, height=200)
-    else:
-        st.error("Unable to extract text from the uploaded file.")
+    st.success("File uploaded successfully.")
+else:
+    st.info("Please upload a PDF file.")
 
 # Categorization and Display
 if cv_text.strip():
