@@ -30,6 +30,7 @@ def extract_text_from_pdf(file):
         return f"Error reading PDF: {e}"
 
 def categorize_text(text):
+    # Define categories and keywords
     categories = {
         "Education": ["education", "degree", "university", "bachelor", "master", "phd"],
         "Experience": ["experience", "worked", "job", "position", "years"],
@@ -39,21 +40,21 @@ def categorize_text(text):
         "SoftSkill": ["communication", "leadership", "teamwork", "problem-solving"],
     }
 
-    category_counts = {category: 0 for category in categories.keys()}
-    for category, keywords in categories.items():
-        for keyword in keywords:
-            category_counts[category] += len(re.findall(rf"\b{keyword}\b", text, flags=re.IGNORECASE))
-    return category_counts
+    counts = {cat: 0 for cat in categories}
+    for cat, keywords in categories.items():
+        for kw in keywords:
+            counts[cat] += len(re.findall(rf"\b{kw}\b", text, flags=re.IGNORECASE))
+    return counts
 
+# Load models once
 models = load_models()
 
 st.title("CV Parsing and Text Classification App")
 
-# Upload CV File
-uploaded_file = st.file_uploader("Upload your CV (PDF format only):", type=["pdf"])
+# Upload PDF
+uploaded_file = st.file_uploader("Upload your CV (PDF only):", type=["pdf"])
 
 cv_text = ""
-
 if uploaded_file is not None:
     cv_text = extract_text_from_pdf(uploaded_file)
     if cv_text.strip():
@@ -61,28 +62,28 @@ if uploaded_file is not None:
     else:
         st.error("Unable to extract text from the uploaded file.")
 
-# Categorization and Display
+# Show category counts if text exists
 if cv_text.strip():
     st.subheader("Categorization Results")
-    category_counts = categorize_text(cv_text)
-    
-    # Format output sesuai permintaan
-    lines = [
-        f"Education       {category_counts['Education']}",
-        f"    Experience   {category_counts['Experience']}",
-        f"   Requirement {category_counts['Requirement']}",
-        f"Responsibility    {category_counts['Responsibility']}",
-        f"         Skill       {category_counts['Skill']}",
-        f"     SoftSkill {category_counts['SoftSkill']}",
+    counts = categorize_text(cv_text)
+
+    # Format output like yang kamu mau
+    output_lines = [
+        f"Education       {counts['Education']}",
+        f"    Experience   {counts['Experience']}",
+        f"   Requirement {counts['Requirement']}",
+        f"Responsibility    {counts['Responsibility']}",
+        f"         Skill       {counts['Skill']}",
+        f"     SoftSkill {counts['SoftSkill']}",
     ]
-    formatted_output = "\n".join(lines)
+    formatted_output = "\n".join(output_lines)
     st.text_area("Category Counts:", formatted_output, height=150)
 
-# Text Input for Classification
+# Text input untuk prediksi (manual atau hasil extract)
 st.subheader("Text Input for Classification")
-text = st.text_area("Enter text manually or use the extracted text above:", value=cv_text if cv_text.strip() else "")
+text = st.text_area("Enter text or use extracted text:", value=cv_text if cv_text.strip() else "")
 
-# Model Selection and Prediction
+# Pilih model
 model_choice = st.selectbox("Choose a model:", list(models.keys()))
 
 if st.button("Predict"):
