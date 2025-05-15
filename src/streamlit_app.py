@@ -9,14 +9,14 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 import joblib
-
 import PyPDF2
 import matplotlib.pyplot as plt
 
-MODEL_DIR = os.path.dirname(os.path.abspath(__file__))
+#MODEL_DIR = os.path.dirname(os.path.abspath(__file__))
 
 @st.cache_resource
 def load_models():
+    model_dir = os.path.dirname(os.path.abspath(__file__))
     return {
         "Logistic Regression": joblib.load(os.path.join(MODEL_DIR, "lr_model.pkl")),
         "Naive Bayes": joblib.load(os.path.join(MODEL_DIR, "nb_model.pkl")),
@@ -28,11 +28,7 @@ def load_models():
 def extract_text_from_pdf(file):
     try:
         pdf_reader = PyPDF2.PdfReader(file)
-        text = ""
-        for page in pdf_reader.pages:
-            page_text = page.extract_text()
-            if page_text:
-                text += page_text + "\n"
+        text = "".join(page.extract_text() for page in pdf_reader.pages if page.extract_text())
         return text
     except Exception as e:
         return f"Error reading PDF: {e}"
@@ -46,7 +42,6 @@ def categorize_text(text):
         "Skill": ["skill", "expertise", "proficiency", "tools"],
         "SoftSkill": ["communication", "leadership", "teamwork", "problem-solving"],
     }
-
     category_counts = {category: 0 for category in categories.keys()}
     for category, keywords in categories.items():
         for keyword in keywords:
@@ -58,7 +53,6 @@ st.title("CV Parsing and Text Classification App")
 models = load_models()
 
 uploaded_file = st.file_uploader("Upload your CV (PDF format only):", type=["pdf"])
-
 cv_text = ""
 
 if uploaded_file is not None:
@@ -72,6 +66,19 @@ if uploaded_file is not None:
     except Exception as e:
         st.error(f"Error processing file: {e}")
 
+if cv_text.strip():
+    st.subheader("Category Distribution (Pie Chart)")
+    category_counts = categorize_text(cv_text)
+    total_count = sum(category_counts.values())
+    labels = [
+        f"{category} ({count} - {count / total_count * 100:.1f}%)"
+        for category, count in category_counts.items()
+    ]
+    fig, ax = plt.subplots()
+    ax.pie(category_counts.values(), labels=labels, autopct='%1.1f%%', startangle=90)
+    ax.axis("equal")
+    st.pyplot(fig)
+
 st.subheader("Text Input for Classification")
 text = st.text_area("Enter text manually or use the extracted text above:", value=cv_text if cv_text.strip() else "")
 
@@ -84,15 +91,3 @@ if st.button("Predict"):
         model = models[model_choice]
         prediction = model.predict([text])[0]
         st.success(f"Prediction: {prediction}")
-        
-        # Perform categorization and display results after prediction
-        st.subheader("Categorization Results")
-        category_counts = categorize_text(text)  # Use the input text for categorization
-        df = pd.DataFrame(list(category_counts.items()), columns=["Category", "Count"])
-        st.table(df)
-
-        st.subheader("Category Distribution (Pie Chart)")
-        fig, ax = plt.subplots()
-        ax.pie(category_counts.values(), labels=category_counts.keys(), autopct='%1.1f%%', startangle=90)
-        ax.axis('equal')
-        st.pyplot(fig)
