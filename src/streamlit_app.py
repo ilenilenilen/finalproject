@@ -5,6 +5,7 @@ import streamlit as st
 import joblib
 import os
 import PyPDF2
+import matplotlib.pyplot as plt
 
 MODEL_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -64,6 +65,20 @@ if uploaded_file is not None:
     else:
         st.error("Unable to extract text from the uploaded file.")
 
+# Categorization and Display
+if cv_text.strip():
+    st.subheader("Categorization Results")
+    category_counts = categorize_text(cv_text)
+    df = pd.DataFrame(list(category_counts.items()), columns=["Category", "Count"])
+    st.table(df)
+
+    # Pie Chart Visualization
+    st.subheader("Category Distribution (Pie Chart)")
+    fig, ax = plt.subplots()
+    ax.pie(category_counts.values(), labels=category_counts.keys(), autopct='%1.1f%%', startangle=90)
+    ax.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle.
+    st.pyplot(fig)
+
 # Text Input for Classification (either manual or from extracted text)
 st.subheader("Text Input for Classification")
 text = st.text_area("Enter text manually or use the extracted text above:", value=cv_text if cv_text.strip() else "")
@@ -75,15 +90,6 @@ if st.button("Predict"):
     if not text.strip():
         st.warning("Please enter or select some text.")
     else:
-        # Make prediction using the selected model
         model = models[model_choice]
         prediction = model.predict([text])[0]
-
-        # Categorize the input text
-        category_counts = categorize_text(text)
-        df = pd.DataFrame(list(category_counts.items()), columns=["Category", "Count"])
-
-        # Display results
         st.success(f"Prediction: {prediction}")
-        st.subheader("Categorization Results")
-        st.table(df)
