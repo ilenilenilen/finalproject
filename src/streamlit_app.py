@@ -66,7 +66,8 @@ if uploaded_file is not None:
     except Exception as e:
         st.error(f"Error processing file: {e}")
 
-
+st.subheader("Text Input for Classification")
+text = st.text_area("Enter text manually or use the extracted text above:", value=cv_text if cv_text.strip() else "")
 
 model_choice = st.selectbox("Choose a model:", list(models.keys()))
 
