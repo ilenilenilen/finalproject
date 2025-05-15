@@ -29,7 +29,7 @@ def extract_text_from_pdf(file):
                 text += page_text + "\n"
         return text
     except Exception as e:
-        return ""
+        return f"Error reading PDF: {e}"
 
 def categorize_text(text):
     categories = {
@@ -53,26 +53,39 @@ models = load_models()
 
 uploaded_file = st.file_uploader("Upload your CV (PDF format only):", type=["pdf"])
 
+cv_text = ""
+
 if uploaded_file is not None:
-    cv_text = extract_text_from_pdf(uploaded_file)
+    try:
+        with uploaded_file:
+            cv_text = extract_text_from_pdf(uploaded_file)
+        if cv_text.strip():
+            st.text_area("Extracted Text:", cv_text, height=200)
+        else:
+            st.error("No text could be extracted from the uploaded file.")
+    except Exception as e:
+        st.error(f"Error processing file: {e}")
 
-    if not cv_text.strip():
-        st.error("No text could be extracted from the uploaded PDF.")
+
+
+model_choice = st.selectbox("Choose a model:", list(models.keys()))
+
+if st.button("Predict"):
+    if not text.strip():
+        st.warning("Please enter or select some text.")
     else:
-        model_choice = st.selectbox("Choose a model:", list(models.keys()))
-        if st.button("Predict"):
-            model = models[model_choice]
-            prediction = model.predict([cv_text])[0]
-            st.success(f"Prediction: {prediction}")
+        model = models[model_choice]
+        prediction = model.predict([text])[0]
+        st.success(f"Prediction: {prediction}")
+        
+        # Perform categorization and display results after prediction
+        st.subheader("Categorization Results")
+        category_counts = categorize_text(text)  # Use the input text for categorization
+        df = pd.DataFrame(list(category_counts.items()), columns=["Category", "Count"])
+        st.table(df)
 
-            # Categorization
-            st.subheader("Categorization Results")
-            category_counts = categorize_text(cv_text)
-            df = pd.DataFrame(list(category_counts.items()), columns=["Category", "Count"])
-            st.table(df)
-
-            st.subheader("Category Distribution (Pie Chart)")
-            fig, ax = plt.subplots()
-            ax.pie(category_counts.values(), labels=category_counts.keys(), autopct='%1.1f%%', startangle=90)
-            ax.axis('equal')
-            st.pyplot(fig)
+        st.subheader("Category Distribution (Pie Chart)")
+        fig, ax = plt.subplots()
+        ax.pie(category_counts.values(), labels=category_counts.keys(), autopct='%1.1f%%', startangle=90)
+        ax.axis('equal')
+        st.pyplot(fig)
