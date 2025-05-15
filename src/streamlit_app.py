@@ -20,13 +20,16 @@ def load_models():
 
 
 def extract_text_from_pdf(file):
-    pdf_reader = PyPDF2.PdfReader(file)
-    text = ""
-    for page in pdf_reader.pages:
-        page_text = page.extract_text()
-        if page_text:
-            text += page_text + "\n"
-    return text
+    try:
+        pdf_reader = PyPDF2.PdfReader(file)
+        text = ""
+        for page in pdf_reader.pages:
+            page_text = page.extract_text()
+            if page_text:
+                text += page_text + "\n"
+        return text
+    except Exception as e:
+        return f"Error reading PDF: {e}"
 
 def categorize_text(text):
     categories = {
@@ -37,40 +40,53 @@ def categorize_text(text):
         "Skill": ["skill", "expertise", "proficiency", "tools"],
         "SoftSkill": ["communication", "leadership", "teamwork", "problem-solving"],
     }
-    counts = {}
-    for category, keywords in categories.items():
-        count = 0
-        for kw in keywords:
-            count += len(re.findall(rf"\b{kw}\b", text, flags=re.IGNORECASE))
-        counts[category] = count
-    return counts
 
-st.title("CV Parsing and Text Classification")
+    category_counts = {category: 0 for category in categories.keys()}
+    for category, keywords in categories.items():
+        for keyword in keywords:
+            category_counts[category] += len(re.findall(rf"\b{keyword}\b", text, flags=re.IGNORECASE))
+    return category_counts
+
+st.title("CV Parsing and Text Classification App")
 
 models = load_models()
 
-uploaded_file = st.file_uploader("Upload CV (PDF only):", type=["pdf"])
+uploaded_file = st.file_uploader("Upload your CV (PDF format only):", type=["pdf"])
+
+cv_text = ""
 
 if uploaded_file is not None:
-    cv_text = extract_text_from_pdf(uploaded_file)
-    st.subheader("Extracted CV Text")
-    st.text_area("", cv_text, height=200)
+    try:
+        with uploaded_file:
+            cv_text = extract_text_from_pdf(uploaded_file)
+        if cv_text.strip():
+            st.text_area("Extracted Text:", cv_text, height=200)
+        else:
+            st.error("No text could be extracted from the uploaded file.")
+    except Exception as e:
+        st.error(f"Error processing file: {e}")
 
-    st.subheader("Select Model")
-    model_choice = st.selectbox("Choose model:", list(models.keys()))
+st.subheader("Text Input for Classification")
+text = st.text_area("Enter text manually or use the extracted text above:", value=cv_text if cv_text.strip() else "")
 
-    if st.button("Predict"):
+model_choice = st.selectbox("Choose a model:", list(models.keys()))
+
+if st.button("Predict"):
+    if not text.strip():
+        st.warning("Please enter or select some text.")
+    else:
         model = models[model_choice]
-        pred = model.predict([cv_text])[0]
-        st.success(f"Prediction: {pred}")
-
+        prediction = model.predict([text])[0]
+        st.success(f"Prediction: {prediction}")
+        
+        # Perform categorization and display results after prediction
         st.subheader("Categorization Results")
-        cat_counts = categorize_text(cv_text)
-        df = pd.DataFrame(cat_counts.items(), columns=["Category", "Count"])
-        st.dataframe(df)
+        category_counts = categorize_text(text)  # Use the input text for categorization
+        df = pd.DataFrame(list(category_counts.items()), columns=["Category", "Count"])
+        st.table(df)
 
-        st.subheader("Category Distribution Pie Chart")
+        st.subheader("Category Distribution (Pie Chart)")
         fig, ax = plt.subplots()
-        ax.pie(df["Count"], labels=df["Category"], autopct="%1.1f%%", startangle=90)
-        ax.axis("equal")
+        ax.pie(category_counts.values(), labels=category_counts.keys(), autopct='%1.1f%%', startangle=90)
+        ax.axis('equal')
         st.pyplot(fig)
