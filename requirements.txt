@@ -5,4 +5,3 @@ numpy
 scikit-learn
 PyPDF2
 matplotlib
-tempfile
