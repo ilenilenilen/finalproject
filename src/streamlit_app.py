@@ -32,7 +32,6 @@ def extract_text_from_pdf(file):
         return f"Error reading PDF: {e}"
 
 def categorize_text(text):
-    # Define categories and their respective keywords
     categories = {
         "Education": ["education", "degree", "university", "bachelor", "master", "phd"],
         "Experience": ["experience", "worked", "job", "position", "years"],
@@ -42,19 +41,16 @@ def categorize_text(text):
         "SoftSkill": ["communication", "leadership", "teamwork", "problem-solving"],
     }
 
-    # Count occurrences of keywords in the text
     category_counts = {category: 0 for category in categories.keys()}
     for category, keywords in categories.items():
         for keyword in keywords:
             category_counts[category] += len(re.findall(rf"\b{keyword}\b", text, flags=re.IGNORECASE))
     return category_counts
 
-# Load models once
-models = load_models()
-
 st.title("CV Parsing and Text Classification App")
 
-# Upload CV File
+models = load_models()
+
 uploaded_file = st.file_uploader("Upload your CV (PDF format only):", type=["pdf"])
 
 cv_text = ""
@@ -70,33 +66,9 @@ if uploaded_file is not None:
     except Exception as e:
         st.error(f"Error processing file: {e}")
 
-if cv_text.strip():
-    st.subheader("Category Distribution (Pie Chart)")
-    category_counts = categorize_text(cv_text)
-
-    # Calculate total count and prepare labels with both count and percentage
-    total_count = sum(category_counts.values())
-    labels = [
-        f"{category} ({count} - {count / total_count * 100:.1f}%)"
-        for category, count in category_counts.items()
-    ]
-
-    # Create pie chart
-    fig, ax = plt.subplots()
-    ax.pie(
-        category_counts.values(),
-        labels=labels,
-        autopct='%1.1f%%',
-        startangle=90
-    )
-    ax.axis("equal")  # Equal aspect ratio ensures the pie is drawn as a circle.
-    st.pyplot(fig)
-
-# Text Input for Classification
 st.subheader("Text Input for Classification")
 text = st.text_area("Enter text manually or use the extracted text above:", value=cv_text if cv_text.strip() else "")
 
-# Model Selection and Prediction
 model_choice = st.selectbox("Choose a model:", list(models.keys()))
 
 if st.button("Predict"):
@@ -106,3 +78,15 @@ if st.button("Predict"):
         model = models[model_choice]
         prediction = model.predict([text])[0]
         st.success(f"Prediction: {prediction}")
+        
+        # Perform categorization and display results after prediction
+        st.subheader("Categorization Results")
+        category_counts = categorize_text(text)  # Use the input text for categorization
+        df = pd.DataFrame(list(category_counts.items()), columns=["Category", "Count"])
+        st.table(df)
+
+        st.subheader("Category Distribution (Pie Chart)")
+        fig, ax = plt.subplots()
+        ax.pie(category_counts.values(), labels=category_counts.keys(), autopct='%1.1f%%', startangle=90)
+        ax.axis('equal')
+        st.pyplot(fig)
