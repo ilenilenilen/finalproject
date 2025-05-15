@@ -64,10 +64,6 @@ if cv_text.strip():
     df = pd.DataFrame(list(category_counts.items()), columns=["Category", "Count"])
     st.table(df)
 
-# Input Text (From CV or Manual Entry)
-st.subheader("Text Input for Classification")
-text = st.text_area("Enter text manually or use the extracted text above:", value=cv_text if cv_text.strip() else "")
-
 # Model Selection and Prediction
 model_choice = st.selectbox("Choose a model:", list(models.keys()))
 
