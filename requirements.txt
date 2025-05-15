@@ -3,5 +3,4 @@ streamlit
 joblib
 numpy
 scikit-learn
-re
 PyPDF2
