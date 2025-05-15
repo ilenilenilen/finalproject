@@ -5,6 +5,7 @@ import streamlit as st
 import joblib
 import os
 import PyPDF2
+import tempfile
 import matplotlib.pyplot as plt
 
 MODEL_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -19,19 +20,22 @@ def load_models():
     }
 
 
-def extract_text_from_pdf(file):
+def extract_text_from_pdf(file_path):
+    """Extract text from a PDF file."""
     try:
-        pdf_reader = PyPDF2.PdfReader(file)
-        text = ""
-        for page in pdf_reader.pages:
-            page_text = page.extract_text()
-            if page_text:
-                text += page_text + "\n"
-        return text
+        with open(file_path, "rb") as f:
+            pdf_reader = PyPDF2.PdfReader(f)
+            text = ""
+            for page in pdf_reader.pages:
+                page_text = page.extract_text()
+                if page_text:
+                    text += page_text + "\n"
+            return text
     except Exception as e:
         return f"Error reading PDF: {e}"
 
 def categorize_text(text):
+    """Categorize text into predefined categories based on keywords."""
     categories = {
         "Education": ["education", "degree", "university", "bachelor", "master", "phd"],
         "Experience": ["experience", "worked", "job", "position", "years"],
@@ -40,25 +44,29 @@ def categorize_text(text):
         "Skill": ["skill", "expertise", "proficiency", "tools"],
         "SoftSkill": ["communication", "leadership", "teamwork", "problem-solving"],
     }
-
     category_counts = {category: 0 for category in categories.keys()}
     for category, keywords in categories.items():
         for keyword in keywords:
             category_counts[category] += len(re.findall(rf"\b{keyword}\b", text, flags=re.IGNORECASE))
     return category_counts
 
+# Streamlit App
 st.title("CV Parsing and Text Classification App")
 
+# Load models
 models = load_models()
 
+# File uploader
 uploaded_file = st.file_uploader("Upload your CV (PDF format only):", type=["pdf"])
-
 cv_text = ""
 
 if uploaded_file is not None:
     try:
-        with uploaded_file:
-            cv_text = extract_text_from_pdf(uploaded_file)
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_file:
+            temp_file.write(uploaded_file.read())
+            temp_file_path = temp_file.name
+            cv_text = extract_text_from_pdf(temp_file_path)
+        
         if cv_text.strip():
             st.text_area("Extracted Text:", cv_text, height=200)
         else:
@@ -66,27 +74,31 @@ if uploaded_file is not None:
     except Exception as e:
         st.error(f"Error processing file: {e}")
 
+# Model selection and prediction
 st.subheader("Text Input for Classification")
 text = st.text_area("Enter text manually or use the extracted text above:", value=cv_text if cv_text.strip() else "")
-
 model_choice = st.selectbox("Choose a model:", list(models.keys()))
 
 if st.button("Predict"):
     if not text.strip():
         st.warning("Please enter or select some text.")
     else:
+        # Perform prediction
         model = models[model_choice]
         prediction = model.predict([text])[0]
         st.success(f"Prediction: {prediction}")
         
-        # Perform categorization and display results after prediction
+        # Categorization
         st.subheader("Categorization Results")
-        category_counts = categorize_text(text)  # Use the input text for categorization
+        category_counts = categorize_text(text)
         df = pd.DataFrame(list(category_counts.items()), columns=["Category", "Count"])
-        st.table(df)
-
-        st.subheader("Category Distribution (Pie Chart)")
-        fig, ax = plt.subplots()
-        ax.pie(category_counts.values(), labels=category_counts.keys(), autopct='%1.1f%%', startangle=90)
-        ax.axis('equal')
-        st.pyplot(fig)
+        
+        # Display table and chart together
+        col1, col2 = st.columns(2)
+        with col1:
+            st.table(df)
+        with col2:
+            fig, ax = plt.subplots()
+            ax.pie(category_counts.values(), labels=category_counts.keys(), autopct='%1.1f%%', startangle=90)
+            ax.axis('equal')
+            st.pyplot(fig)
