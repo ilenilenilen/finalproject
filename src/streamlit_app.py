@@ -52,10 +52,13 @@ st.title("CV Parsing and Text Classification App")
 # Upload CV File
 uploaded_file = st.file_uploader("Upload your CV (PDF format only):", type=["pdf"])
 
+cv_text = ""
 if uploaded_file is not None:
-    st.success("File uploaded successfully.")
-else:
-    st.info("Please upload a PDF file.")
+    cv_text = extract_text_from_pdf(uploaded_file)
+    if cv_text.strip():
+        st.text_area("Extracted Text:", cv_text, height=200)
+    else:
+        st.error("Unable to extract text from the uploaded file.")
 
 # Categorization and Display
 if cv_text.strip():
@@ -63,6 +66,10 @@ if cv_text.strip():
     category_counts = categorize_text(cv_text)
     df = pd.DataFrame(list(category_counts.items()), columns=["Category", "Count"])
     st.table(df)
+
+# Text Input for Prediction
+st.subheader("Text Input for Classification")
+text = st.text_area("Enter text manually or use the extracted text above:", value=cv_text if cv_text.strip() else "")
 
 # Model Selection and Prediction
 model_choice = st.selectbox("Choose a model:", list(models.keys()))
