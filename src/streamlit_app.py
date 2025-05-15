@@ -22,7 +22,9 @@ def extract_text_from_pdf(file):
         pdf_reader = PyPDF2.PdfReader(file)
         text = ""
         for page in pdf_reader.pages:
-            text += page.extract_text()
+            page_text = page.extract_text()
+            if page_text:
+                text += page_text + "\n"
         return text
     except Exception as e:
         return f"Error reading PDF: {e}"
@@ -45,6 +47,7 @@ def categorize_text(text):
             category_counts[category] += len(re.findall(rf"\b{keyword}\b", text, flags=re.IGNORECASE))
     return category_counts
 
+# Load models once
 models = load_models()
 
 st.title("CV Parsing and Text Classification App")
@@ -52,7 +55,8 @@ st.title("CV Parsing and Text Classification App")
 # Upload CV File
 uploaded_file = st.file_uploader("Upload your CV (PDF format only):", type=["pdf"])
 
-cv_text = ""
+cv_text = ""  # initialize variable here so it is always defined
+
 if uploaded_file is not None:
     cv_text = extract_text_from_pdf(uploaded_file)
     if cv_text.strip():
@@ -67,7 +71,7 @@ if cv_text.strip():
     df = pd.DataFrame(list(category_counts.items()), columns=["Category", "Count"])
     st.table(df)
 
-# Text Input for Prediction
+# Text Input for Classification (either manual or from extracted text)
 st.subheader("Text Input for Classification")
 text = st.text_area("Enter text manually or use the extracted text above:", value=cv_text if cv_text.strip() else "")
 
