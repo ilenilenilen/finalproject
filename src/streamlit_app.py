@@ -20,19 +20,15 @@ def load_models():
 
 
 def extract_text_from_pdf(file):
-    try:
-        pdf_reader = PyPDF2.PdfReader(file)
-        text = ""
-        for page in pdf_reader.pages:
-            page_text = page.extract_text()
-            if page_text:
-                text += page_text + "\n"
-        return text
-    except Exception as e:
-        return f"Error reading PDF: {e}"
+    pdf_reader = PyPDF2.PdfReader(file)
+    text = ""
+    for page in pdf_reader.pages:
+        page_text = page.extract_text()
+        if page_text:
+            text += page_text + "\n"
+    return text
 
 def categorize_text(text):
-    # Define categories and their respective keywords
     categories = {
         "Education": ["education", "degree", "university", "bachelor", "master", "phd"],
         "Experience": ["experience", "worked", "job", "position", "years"],
@@ -41,60 +37,40 @@ def categorize_text(text):
         "Skill": ["skill", "expertise", "proficiency", "tools"],
         "SoftSkill": ["communication", "leadership", "teamwork", "problem-solving"],
     }
-
-    # Count occurrences of keywords in the text
-    category_counts = {category: 0 for category in categories.keys()}
+    counts = {}
     for category, keywords in categories.items():
-        for keyword in keywords:
-            category_counts[category] += len(re.findall(rf"\b{keyword}\b", text, flags=re.IGNORECASE))
-    return category_counts
+        count = 0
+        for kw in keywords:
+            count += len(re.findall(rf"\b{kw}\b", text, flags=re.IGNORECASE))
+        counts[category] = count
+    return counts
 
-# Load models once
+st.title("CV Parsing and Text Classification")
+
 models = load_models()
 
-st.title("CV Parsing and Text Classification App")
-
-# Upload CV File
-uploaded_file = st.file_uploader("Upload your CV (PDF format only):", type=["pdf"])
-
-cv_text = ""  # initialize variable here so it is always defined
+uploaded_file = st.file_uploader("Upload CV (PDF only):", type=["pdf"])
 
 if uploaded_file is not None:
-    try:
-        with uploaded_file:
-            cv_text = extract_text_from_pdf(uploaded_file)
-        if cv_text.strip():
-            st.text_area("Extracted Text:", cv_text, height=200)
-        else:
-            st.error("No text could be extracted from the uploaded file.")
-    except Exception as e:
-        st.error(f"Error processing file: {e}")
+    cv_text = extract_text_from_pdf(uploaded_file)
+    st.subheader("Extracted CV Text")
+    st.text_area("", cv_text, height=200)
 
-# Categorization and Display
-if cv_text.strip():
-    st.subheader("Categorization Results")
-    category_counts = categorize_text(cv_text)
-    df = pd.DataFrame(list(category_counts.items()), columns=["Category", "Count"])
-    st.table(df)
+    st.subheader("Select Model")
+    model_choice = st.selectbox("Choose model:", list(models.keys()))
 
-    # Pie Chart Visualization
-    st.subheader("Category Distribution (Pie Chart)")
-    fig, ax = plt.subplots()
-    ax.pie(category_counts.values(), labels=category_counts.keys(), autopct='%1.1f%%', startangle=90)
-    ax.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle.
-    st.pyplot(fig)
-
-# Text Input for Classification (either manual or from extracted text)
-st.subheader("Text Input for Classification")
-text = st.text_area("Enter text manually or use the extracted text above:", value=cv_text if cv_text.strip() else "")
-
-# Model Selection and Prediction
-model_choice = st.selectbox("Choose a model:", list(models.keys()))
-
-if st.button("Predict"):
-    if not text.strip():
-        st.warning("Please enter or select some text.")
-    else:
+    if st.button("Predict"):
         model = models[model_choice]
-        prediction = model.predict([text])[0]
-        st.success(f"Prediction: {prediction}")
+        pred = model.predict([cv_text])[0]
+        st.success(f"Prediction: {pred}")
+
+        st.subheader("Categorization Results")
+        cat_counts = categorize_text(cv_text)
+        df = pd.DataFrame(cat_counts.items(), columns=["Category", "Count"])
+        st.dataframe(df)
+
+        st.subheader("Category Distribution Pie Chart")
+        fig, ax = plt.subplots()
+        ax.pie(df["Count"], labels=df["Category"], autopct="%1.1f%%", startangle=90)
+        ax.axis("equal")
+        st.pyplot(fig)
