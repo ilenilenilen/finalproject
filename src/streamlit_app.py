@@ -17,6 +17,7 @@ def load_models():
     "Naive Bayes": joblib.load(os.path.join(MODEL_DIR, "nb_model.pkl")),
     "Ensemble": joblib.load(os.path.join(MODEL_DIR, "ensemble_model.pkl"), mmap_mode='r'),
     "SVM": joblib.load(os.path.join(MODEL_DIR, "svm_model.pkl")),
+    }
 }
 
 
