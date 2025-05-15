@@ -1,9 +1,15 @@
+import os
+
+# Set writable directories for Streamlit and Matplotlib
+os.environ["STREAMLIT_CONFIG_DIR"] = "/tmp/.streamlit"
+os.environ["MPLCONFIGDIR"] = "/tmp/.matplotlib"
+
 import re
 import numpy as np
 import pandas as pd
 import streamlit as st
 import joblib
-import os
+
 import PyPDF2
 import matplotlib.pyplot as plt
 
