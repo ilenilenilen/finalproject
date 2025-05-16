@@ -1,3 +1,4 @@
+#import library
 import re
 import numpy as np
 import pandas as pd
@@ -7,19 +8,20 @@ import os
 import PyPDF2
 import matplotlib.pyplot as plt
 
-
+#mencari model yang tersimpan
 MODEL_DIR = os.path.dirname(os.path.abspath(__file__))
 
+#memuat model yang tersimpan
 @st.cache_resource
 def load_models():
     return {
-        "Logistic Regression": joblib.load(os.path.join(MODEL_DIR, "lr_model.pkl")),
-        "Naive Bayes": joblib.load(os.path.join(MODEL_DIR, "nb_model.pkl")),
-        "Ensemble": joblib.load(os.path.join(MODEL_DIR, "ensemble_model.pkl"), mmap_mode='r'),
-        "SVM": joblib.load(os.path.join(MODEL_DIR, "svm_model.pkl")),
+        "Logistic Regression":joblib.load(os.path.join(MODEL_DIR, "lr_model.pkl")),
+        "Naive Bayes":joblib.load(os.path.join(MODEL_DIR, "nb_model.pkl")),
+        "Ensemble":joblib.load(os.path.join(MODEL_DIR, "ensemble_model.pkl"), mmap_mode='r'),
+        "SVM":joblib.load(os.path.join(MODEL_DIR, "svm_model.pkl")),
     }
 
-
+#extract file from PDF
 def extract_text_from_pdf(file):
     try:
         pdf_reader = PyPDF2.PdfReader(file)
@@ -32,28 +34,34 @@ def extract_text_from_pdf(file):
     except Exception as e:
         return f"Error reading PDF: {e}"
 
+
 def categorize_text(text):
     categories = {
-        "Education": ["education", "degree", "university", "bachelor", "master", "phd"],
-        "Experience": ["experience", "worked", "job", "position", "years"],
-        "Requirement": ["requirement", "required", "criteria"],
-        "Responsibility": ["responsibility", "tasks", "duty"],
-        "Skill": ["skill", "expertise", "proficiency", "tools"],
-        "SoftSkill": ["communication", "leadership", "teamwork", "problem-solving"],
+        "Education":["education", "degree", "university", "bachelor", "master", "phd"],
+        "Experience":["experience", "worked", "job", "position", "years"],
+        "Requirement":["requirement", "required", "criteria"],
+        "Responsibility":["responsibility", "tasks", "duty"],
+        "Skill":["skill", "expertise", "proficiency", "tools"],
+        "SoftSkill":["communication", "leadership", "teamwork", "problem-solving"],
     }
 
+#menyimpan jumlah kata kunci yang ditemukan di text dan dikelompokkan berdasarkan kategori
     category_counts = {category: 0 for category in categories.keys()}
     for category, keywords in categories.items():
         for keyword in keywords:
             category_counts[category] += len(re.findall(rf"\b{keyword}\b", text, flags=re.IGNORECASE))
     return category_counts
 
+#Judul
 st.title("CV Parsing and Text Classification App")
 
+#memuat model
 models = load_models()
 
+#mengunggah file PDF
 uploaded_file = st.file_uploader("Upload your CV (PDF format only):", type=["pdf"])
 
+#Proses extraksi text
 cv_text = ""
 
 if uploaded_file is not None:
@@ -67,11 +75,14 @@ if uploaded_file is not None:
     except Exception as e:
         st.error(f"Error processing file: {e}")
 
+#Input manual
 st.subheader("Text Input for Classification")
 text = st.text_area("Enter text manually or use the extracted text above:", value=cv_text if cv_text.strip() else "")
 
+#memilih model
 model_choice = st.selectbox("Choose a model:", list(models.keys()))
 
+#Button prediksi
 if st.button("Predict"):
     if not text.strip():
         st.warning("Please enter or select some text.")
