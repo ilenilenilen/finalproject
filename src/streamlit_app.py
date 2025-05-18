@@ -5,23 +5,14 @@ import PyPDF2
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
-import nltk.data
-
-# Patch nltk.data.find to replace 'punkt_tab' with 'punkt'
-_original_find = nltk.data.find
-
-def patched_find(resource_name, *args, **kwargs):
-    if 'punkt_tab' in resource_name:
-        resource_name = resource_name.replace('punkt_tab', 'punkt')
-    return _original_find(resource_name, *args, **kwargs)
-
-nltk.data.find = patched_find
-
 import nltk
-from nltk.tokenize import sent_tokenize
+from nltk.tokenize.punkt import PunktSentenceTokenizer
 
-# Download 'punkt' resource if not available yet
+# Download 'punkt' tokenizer resource quietly if not already downloaded
 nltk.download('punkt', quiet=True)
+
+# Initialize the Punkt tokenizer explicitly
+tokenizer = PunktSentenceTokenizer()
 
 MODEL_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -56,7 +47,7 @@ def categorize_sentences(text):
         "SoftSkill": ["communication", "leadership", "teamwork", "problem-solving"],
     }
     
-    sentences = sent_tokenize(text)
+    sentences = tokenizer.tokenize(text)  # Use explicit Punkt tokenizer
     categorized_sentences = []
 
     for sent in sentences:
@@ -105,8 +96,8 @@ if st.button("Predict"):
         st.subheader("Categorization Per Sentence")
         categorized = categorize_sentences(text)
         for item in categorized:
-            st.markdown(f"- **Kalimat:** {item['sentence']}")
-            st.markdown(f"  - **Kategori:** {', '.join(item['categories'])}")
+            st.markdown(f"- **Sentence:** {item['sentence']}")
+            st.markdown(f"  - **Category:** {', '.join(item['categories'])}")
 
         st.subheader("Category Distribution (Pie Chart)")
         all_categories = [cat for item in categorized for cat in item['categories']]
