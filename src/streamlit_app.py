@@ -43,13 +43,19 @@ def categorize_sentences(text):
         "Experience": ["experience", "worked", "job", "position", "years"],
         "Requirement": ["requirement", "required", "criteria"],
         "Responsibility": ["responsibility", "tasks", "duty"],
-        "Skill": ["skill","skills", "expertise", "proficiency", "tools", "speaking"],
-        "SoftSkill": ["communication", "leadership", "teamwork", "problem-solving"],
+        "Skill": [
+            "skill", "expertise", "proficiency", "tools", "excel", 
+            "project management", "research", "problem solving", "public speaking"
+        ],
+        "SoftSkill": ["communication", "leadership", "teamwork", "problem-solving", "advocacy", "relationship building"],
     }
     
-    # Tokenize sentences, strip each, skip if empty after strip
+    # Tokenize sentences and split further by bullet points
     raw_sentences = tokenizer.tokenize(text)
-    sentences = [s.strip() for s in raw_sentences if s.strip()]
+    sentences = []
+    for s in raw_sentences:
+        sentences.extend(re.split(r"[\n•-]+", s))
+    sentences = [s.strip() for s in sentences if s.strip()]
 
     categorized_sentences = []
     for sent in sentences:
@@ -98,7 +104,7 @@ if st.button("Predict"):
         st.subheader("Categorization Per Sentence")
         categorized = categorize_sentences(text)
 
-        # Tampilkan kalimat dan kategori masing-masing
+        # Display sentences and their categories
         for item in categorized:
             categories_joined = ", ".join(item['categories'])
             st.markdown(f"**Sentence:** {item['sentence']}")
@@ -109,10 +115,11 @@ if st.button("Predict"):
         all_categories = [cat for item in categorized for cat in item['categories']]
         df_cat = pd.Series(all_categories).value_counts()
 
-        # Tampilkan ringkasan kategori dengan jumlahnya (misal: Education 2, Experience 1)
+        # Display category summary
         summary = ", ".join([f"{cat} {count}" for cat, count in df_cat.items()])
         st.markdown(f"**Summary:** {summary}")
 
+        # Generate pie chart for category distribution
         fig, ax = plt.subplots()
         ax.pie(df_cat.values, labels=df_cat.index, autopct='%1.1f%%', startangle=90)
         ax.axis('equal')
