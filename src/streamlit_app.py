@@ -5,10 +5,22 @@ import PyPDF2
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
+import nltk.data
+
+# Patch nltk.data.find to replace 'punkt_tab' with 'punkt'
+_original_find = nltk.data.find
+
+def patched_find(resource_name, *args, **kwargs):
+    if 'punkt_tab' in resource_name:
+        resource_name = resource_name.replace('punkt_tab', 'punkt')
+    return _original_find(resource_name, *args, **kwargs)
+
+nltk.data.find = patched_find
+
 import nltk
 from nltk.tokenize import sent_tokenize
 
-# Download 'punkt' resource jika belum ada
+# Download 'punkt' resource if not available yet
 nltk.download('punkt', quiet=True)
 
 MODEL_DIR = os.path.dirname(os.path.abspath(__file__))
