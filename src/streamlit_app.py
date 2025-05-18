@@ -43,7 +43,7 @@ def categorize_sentences(text):
         "Experience": ["experience", "worked", "job", "position", "years"],
         "Requirement": ["requirement", "required", "criteria"],
         "Responsibility": ["responsibility", "tasks", "duty"],
-        "Skill": ["skill", "expertise", "proficiency", "tools"],
+        "Skill": ["skill","skills", "expertise", "proficiency", "tools", "speaking"],
         "SoftSkill": ["communication", "leadership", "teamwork", "problem-solving"],
     }
     
