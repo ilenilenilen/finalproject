@@ -8,10 +8,9 @@ import matplotlib.pyplot as plt
 import nltk
 from nltk.tokenize import sent_tokenize
 
-# Pastikan nltk tokenizer sudah ada
-nltk.download('punkt')
+# Download 'punkt' resource jika belum ada
+nltk.download('punkt', quiet=True)
 
-# Direktori model (sesuaikan jika perlu)
 MODEL_DIR = os.path.dirname(os.path.abspath(__file__))
 
 @st.cache_resource
@@ -93,14 +92,11 @@ if st.button("Predict"):
 
         st.subheader("Categorization Per Sentence")
         categorized = categorize_sentences(text)
-        # Tampilkan kalimat dan kategorinya
         for item in categorized:
             st.markdown(f"- **Kalimat:** {item['sentence']}")
             st.markdown(f"  - **Kategori:** {', '.join(item['categories'])}")
 
-        # Pie chart distribusi kategori (total semua kalimat)
         st.subheader("Category Distribution (Pie Chart)")
-        # Hitung frekuensi tiap kategori (flatten list kategori semua kalimat)
         all_categories = [cat for item in categorized for cat in item['categories']]
         df_cat = pd.Series(all_categories).value_counts()
 
