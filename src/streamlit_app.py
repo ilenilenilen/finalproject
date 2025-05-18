@@ -47,9 +47,11 @@ def categorize_sentences(text):
         "SoftSkill": ["communication", "leadership", "teamwork", "problem-solving"],
     }
     
-    sentences = tokenizer.tokenize(text)  # Use explicit Punkt tokenizer
-    categorized_sentences = []
+    # Tokenize sentences, strip each, skip if empty after strip
+    raw_sentences = tokenizer.tokenize(text)
+    sentences = [s.strip() for s in raw_sentences if s.strip()]
 
+    categorized_sentences = []
     for sent in sentences:
         sent_lower = sent.lower()
         sent_categories = []
@@ -95,13 +97,21 @@ if st.button("Predict"):
 
         st.subheader("Categorization Per Sentence")
         categorized = categorize_sentences(text)
+
+        # Tampilkan kalimat dan kategori masing-masing
         for item in categorized:
-            st.markdown(f"- **Sentence:** {item['sentence']}")
-            st.markdown(f"  - **Category:** {', '.join(item['categories'])}")
+            categories_joined = ", ".join(item['categories'])
+            st.markdown(f"**Sentence:** {item['sentence']}")
+            st.markdown(f"**Category:** {categories_joined}")
+            st.markdown("---")
 
         st.subheader("Category Distribution (Pie Chart)")
         all_categories = [cat for item in categorized for cat in item['categories']]
         df_cat = pd.Series(all_categories).value_counts()
+
+        # Tampilkan ringkasan kategori dengan jumlahnya (misal: Education 2, Experience 1)
+        summary = ", ".join([f"{cat} {count}" for cat, count in df_cat.items()])
+        st.markdown(f"**Summary:** {summary}")
 
         fig, ax = plt.subplots()
         ax.pie(df_cat.values, labels=df_cat.index, autopct='%1.1f%%', startangle=90)
