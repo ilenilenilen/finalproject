@@ -39,10 +39,8 @@ def extract_text_from_pdf(file):
 
 def categorize_sentences(text):
     categories = {
-        "Education": ["education", "degree", "university", "bachelor", "master", "phd"],
-        "Experience": ["experience", "worked", "job", "position", "years"],
-        "Requirement": ["requirement", "required", "criteria"],
-        "Responsibility": ["responsibility", "tasks", "duty"],
+        "Education": ["education", "degree", "university", "bachelor", "master", "phd", "gpa"],
+        "Experience": ["experience", "worked", "job", "position", "years", "intern"],
         "Skill": [
             "skill", "expertise", "proficiency", "tools", "excel", 
             "project management", "research", "problem solving", "public speaking"
@@ -58,15 +56,33 @@ def categorize_sentences(text):
     sentences = [s.strip() for s in sentences if s.strip()]
 
     categorized_sentences = []
+    combined_text = ""
+    current_category = None
+
     for sent in sentences:
         sent_lower = sent.lower()
-        sent_categories = []
+        matched_category = None
+        
         for category, keywords in categories.items():
             if any(re.search(rf"\b{kw}\b", sent_lower) for kw in keywords):
-                sent_categories.append(category)
-        if not sent_categories:
-            sent_categories = ["Uncategorized"]
-        categorized_sentences.append({"sentence": sent, "categories": sent_categories})
+                matched_category = category
+                break
+        
+        if matched_category:
+            if current_category and current_category == matched_category:
+                combined_text += " " + sent
+            else:
+                if combined_text:
+                    categorized_sentences.append({"text": combined_text, "category": current_category})
+                combined_text = sent
+                current_category = matched_category
+        else:
+            if current_category:
+                combined_text += " " + sent
+
+    # Add the last combined text
+    if combined_text:
+        categorized_sentences.append({"text": combined_text, "category": current_category})
 
     return categorized_sentences
 
@@ -106,13 +122,12 @@ if st.button("Predict"):
 
         # Display sentences and their categories
         for item in categorized:
-            categories_joined = ", ".join(item['categories'])
-            st.markdown(f"**Sentence:** {item['sentence']}")
-            st.markdown(f"**Category:** {categories_joined}")
+            st.markdown(f"**Category:** {item['category']}")
+            st.markdown(f"**Text:** {item['text']}")
             st.markdown("---")
 
         st.subheader("Category Distribution (Pie Chart)")
-        all_categories = [cat for item in categorized for cat in item['categories']]
+        all_categories = [item['category'] for item in categorized]
         df_cat = pd.Series(all_categories).value_counts()
 
         # Display category summary
