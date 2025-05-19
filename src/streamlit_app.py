@@ -43,6 +43,8 @@ def categorize_sentences(text):
     categories = {
         "Education": ["education", "degree", "university", "bachelor", "master", "phd", "gpa"],
         "Experience": ["experience", "worked", "job", "position", "years", "intern"],
+        "Requirement": ["requirement", "mandatory", "qualification", "criteria", "must", "eligibility"],
+        "Responsibility": ["responsibility", "task", "duty", "role", "accountable", "responsible"],
         "Skill": [
             "skill", "expertise", "proficiency", "tools", "excel",
             "project management", "research", "problem solving", "public speaking"
@@ -89,7 +91,7 @@ def categorize_sentences(text):
 # --- STREAMLIT APP ---
 
 st.title("📄 CV Parsing and Text Classification")
-st.markdown("Easily extract and categorize text from CVs to identify education, experience, skills, and more.")
+st.markdown("Easily extract and categorize text from CVs to identify education, experience, requirements, responsibilities, skills, and soft skills.")
 
 models = load_models()
 
@@ -123,32 +125,34 @@ if st.button("Predict"):
 
         # Convert categorized sentences to DataFrame
         df_categorized = pd.DataFrame(categorized)
+        df_categorized.index += 1  # Change index to start from 1
 
         # Highlight categories in the DataFrame
         def highlight_categories(row):
             colors = {
                 "Education": "#FFDDC1",
                 "Experience": "#FFC1C1",
+                "Requirement": "#C1E1FF",
+                "Responsibility": "#FFDAC1",
                 "Skill": "#C1FFC1",
-                "SoftSkill": "#C1C1FF"
+                "SoftSkill": "#C1C1FF",
             }
             category_color = colors.get(row["category"], "#FFFFFF")
             return [f"background-color: {category_color};"] * len(row)
 
-        st.dataframe(df_categorized.style.apply(highlight_categories, axis=1, subset=["category", "text"]).hide(axis="index"))
+        st.dataframe(df_categorized.style.apply(highlight_categories, axis=1, subset=["category", "text"]))
 
         # Generate category distribution and summary
         all_categories = [item['category'] for item in categorized]
         df_cat = pd.Series(all_categories).value_counts()
 
-        # Display summary as cards
+        # Display summary with colors
         st.markdown("### Summary")
-        cols = st.columns(len(df_cat))  # Dynamic column layout for categories
-        for col, (cat, count) in zip(cols, df_cat.items()):
-            col.markdown(f"""
-                <div style="background-color: #f7f7f7; border-radius: 10px; padding: 10px; text-align: center;">
-                    <h3 style="margin: 0; color: #333;">{cat}</h3>
-                    <p style="margin: 0; font-size: 24px; font-weight: bold; color: #444;">{count}</p>
+        for i, (cat, count) in enumerate(df_cat.items(), start=1):
+            color = mcolors.TABLEAU_COLORS[list(mcolors.TABLEAU_COLORS.keys())[i % len(mcolors.TABLEAU_COLORS)]]
+            st.markdown(f"""
+                <div style="background-color: {color}; border-radius: 10px; padding: 10px; margin-bottom: 10px; color: white;">
+                    <strong>{i}. {cat}</strong>: {count}
                 </div>
             """, unsafe_allow_html=True)
 
