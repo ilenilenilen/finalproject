@@ -42,14 +42,7 @@ def extract_text_from_pdf(file):
 def categorize_sentences(text):
     categories = {
         "Education": ["education", "degree", "university", "bachelor", "master", "phd", "gpa"],
-        "Experience": [
-            "experience", "worked", "job", "position", "years", "intern", "internship",
-            "architect", "staff", "junior", "developed", "created", "produced", "coordinated",
-            "managed", "designed", "supervision", "supervised", "site visit", "oversight",
-            "bill of quantities", "boq", "construction", "drafting", "call customers",
-            "prepared", "report", "monitor", "client request", "regular", "visit", "involved",
-            "engineer", "it", "architectural", "administration", "assistant"
-        ],
+        "Experience": ["experience", "worked", "job", "position", "years", "intern"],
         "Requirement": ["requirement", "mandatory", "qualification", "criteria", "must", "eligibility"],
         "Responsibility": ["responsibility", "task", "duty", "role", "accountable", "responsible"],
         "Skill": [
@@ -62,21 +55,36 @@ def categorize_sentences(text):
     raw_sentences = tokenizer.tokenize(text)
     sentences = []
     for s in raw_sentences:
-        # Split on newlines and bullets for cleaner sentences
         sentences.extend(re.split(r"[\n•-]+", s))
     sentences = [s.strip() for s in sentences if s.strip()]
 
     categorized_sentences = []
+    combined_text = ""
+    current_category = None
+
     for sent in sentences:
         sent_lower = sent.lower()
         matched_category = None
         
         for category, keywords in categories.items():
-            if any(re.search(rf"\b{re.escape(kw)}\b", sent_lower) for kw in keywords):
+            if any(re.search(rf"\b{kw}\b", sent_lower) for kw in keywords):
                 matched_category = category
                 break
+        
+        if matched_category:
+            if current_category and current_category == matched_category:
+                combined_text += " " + sent
+            else:
+                if combined_text:
+                    categorized_sentences.append({"text": combined_text, "category": current_category})
+                combined_text = sent
+                current_category = matched_category
+        else:
+            if current_category:
+                combined_text += " " + sent
 
-        categorized_sentences.append({"text": sent, "category": matched_category})
+    if combined_text:
+        categorized_sentences.append({"text": combined_text, "category": current_category})
 
     return categorized_sentences
 
@@ -135,7 +143,7 @@ if st.button("Predict"):
         st.dataframe(df_categorized.style.apply(highlight_categories, axis=1, subset=["category", "text"]))
 
         # Generate category distribution and summary
-        all_categories = [item['category'] for item in categorized if item['category'] is not None]
+        all_categories = [item['category'] for item in categorized]
         df_cat = pd.Series(all_categories).value_counts()
 
         # Display summary with colors
