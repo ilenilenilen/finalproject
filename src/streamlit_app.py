@@ -6,6 +6,7 @@ import PyPDF2
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
 import nltk
 from nltk.tokenize.punkt import PunktSentenceTokenizer
 
@@ -49,7 +50,6 @@ def categorize_sentences(text):
         "SoftSkill": ["communication", "leadership", "teamwork", "problem-solving", "advocacy", "relationship building"],
     }
     
-    # Tokenize sentences and split further by bullet points
     raw_sentences = tokenizer.tokenize(text)
     sentences = []
     for s in raw_sentences:
@@ -81,7 +81,6 @@ def categorize_sentences(text):
             if current_category:
                 combined_text += " " + sent
 
-    # Add the last combined text
     if combined_text:
         categorized_sentences.append({"text": combined_text, "category": current_category})
 
@@ -89,7 +88,8 @@ def categorize_sentences(text):
 
 # --- STREAMLIT APP ---
 
-st.title("CV Parsing and Text Classification")
+st.title("📄 CV Parsing and Text Classification")
+st.markdown("Easily extract and categorize text from CVs to identify education, experience, skills, and more.")
 
 models = load_models()
 
@@ -124,26 +124,38 @@ if st.button("Predict"):
         # Convert categorized sentences to DataFrame
         df_categorized = pd.DataFrame(categorized)
 
-        # Create two columns for layout
-        col1, col2 = st.columns([2, 1])  # Wider column for table, smaller for summary
+        # Highlight categories in the DataFrame
+        def highlight_categories(row):
+            colors = {
+                "Education": "#FFDDC1",
+                "Experience": "#FFC1C1",
+                "Skill": "#C1FFC1",
+                "SoftSkill": "#C1C1FF"
+            }
+            category_color = colors.get(row["category"], "#FFFFFF")
+            return [f"background-color: {category_color};"] * len(row)
 
-        # Display DataFrame in the first column
-        with col1:
-            st.dataframe(df_categorized, use_container_width=True)
+        st.dataframe(df_categorized.style.apply(highlight_categories, axis=1, subset=["category", "text"]).hide(axis="index"))
 
         # Generate category distribution and summary
         all_categories = [item['category'] for item in categorized]
         df_cat = pd.Series(all_categories).value_counts()
 
-        # Display summary in the second column
-        with col2:
-            st.markdown("### Summary")
-            for cat, count in df_cat.items():
-                st.markdown(f"- **{cat}**: {count}")
+        # Display summary as cards
+        st.markdown("### Summary")
+        cols = st.columns(len(df_cat))  # Dynamic column layout for categories
+        for col, (cat, count) in zip(cols, df_cat.items()):
+            col.markdown(f"""
+                <div style="background-color: #f7f7f7; border-radius: 10px; padding: 10px; text-align: center;">
+                    <h3 style="margin: 0; color: #333;">{cat}</h3>
+                    <p style="margin: 0; font-size: 24px; font-weight: bold; color: #444;">{count}</p>
+                </div>
+            """, unsafe_allow_html=True)
 
         # Pie chart for category distribution
         st.subheader("Category Distribution (Pie Chart)")
         fig, ax = plt.subplots()
-        ax.pie(df_cat.values, labels=df_cat.index, autopct='%1.1f%%', startangle=90)
+        colors = list(mcolors.TABLEAU_COLORS.values())[:len(df_cat)]
+        ax.pie(df_cat.values, labels=df_cat.index, colors=colors, autopct='%1.1f%%', startangle=90)
         ax.axis('equal')
         st.pyplot(fig)
