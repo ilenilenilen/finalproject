@@ -1,3 +1,4 @@
+#Import Library
 import re
 import os
 import joblib
@@ -8,7 +9,7 @@ import matplotlib.pyplot as plt
 import nltk
 from nltk.tokenize.punkt import PunktSentenceTokenizer
 
-# Download 'punkt' tokenizer resource quietly if not already downloaded
+# Download 'punkt' tokenizer
 nltk.download('punkt', quiet=True)
 
 # Initialize the Punkt tokenizer explicitly
