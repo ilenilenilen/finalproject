@@ -44,15 +44,11 @@ def categorize_sentences(text):
         "Education": ["education", "degree", "university", "bachelor", "master", "phd", "gpa"],
         "Experience": [
             "experience", "worked", "job", "position", "years", "intern", "internship",
-            "engineer", "architect", "developer", "designer", "analyst", "consultant",
-            "manager", "staff", "assistant", "specialist", "coordinator", "technician",
-            "junior", "senior", "lead", "head", "created", "developed", "produced",
-            "managed", "designed", "implemented", "supervised", "conducted", "coordinated",
-            "planned", "executed", "monitored", "tested", "supported", "maintained",
-            "resolved", "drafting", "programmed", "coded", "analyzed", "reported",
-            "documented", "collaborated", "organized", "scheduled", "performed", "oversaw",
-            "facilitated", "provided", "assisted", "evaluated", "optimized", "improved",
-            "led", "mentored", "trained", "presented", "audited"
+            "architect", "staff", "junior", "developed", "created", "produced", "coordinated",
+            "managed", "designed", "supervision", "supervised", "site visit", "oversight",
+            "bill of quantities", "boq", "construction", "drafting", "call customers",
+            "prepared", "report", "monitor", "client request", "regular", "visit", "involved",
+            "engineer", "it", "architectural", "administration", "assistant"
         ],
         "Requirement": ["requirement", "mandatory", "qualification", "criteria", "must", "eligibility"],
         "Responsibility": ["responsibility", "task", "duty", "role", "accountable", "responsible"],
@@ -63,17 +59,14 @@ def categorize_sentences(text):
         "SoftSkill": ["communication", "leadership", "teamwork", "problem-solving", "advocacy", "relationship building"],
     }
     
-    # Tokenize sentences and split further by bullet points or new lines
     raw_sentences = tokenizer.tokenize(text)
     sentences = []
     for s in raw_sentences:
+        # Split on newlines and bullets for cleaner sentences
         sentences.extend(re.split(r"[\n•-]+", s))
     sentences = [s.strip() for s in sentences if s.strip()]
 
     categorized_sentences = []
-    combined_text = ""
-    current_category = None
-
     for sent in sentences:
         sent_lower = sent.lower()
         matched_category = None
@@ -82,21 +75,8 @@ def categorize_sentences(text):
             if any(re.search(rf"\b{re.escape(kw)}\b", sent_lower) for kw in keywords):
                 matched_category = category
                 break
-        
-        if matched_category:
-            if current_category and current_category == matched_category:
-                combined_text += " " + sent
-            else:
-                if combined_text:
-                    categorized_sentences.append({"text": combined_text, "category": current_category})
-                combined_text = sent
-                current_category = matched_category
-        else:
-            if current_category:
-                combined_text += " " + sent
 
-    if combined_text:
-        categorized_sentences.append({"text": combined_text, "category": current_category})
+        categorized_sentences.append({"text": sent, "category": matched_category})
 
     return categorized_sentences
 
@@ -137,7 +117,7 @@ if st.button("Predict"):
 
         # Convert categorized sentences to DataFrame
         df_categorized = pd.DataFrame(categorized)
-        df_categorized.index += 1  # Start index from 1
+        df_categorized.index += 1  # Change index to start from 1
 
         # Highlight categories in the DataFrame
         def highlight_categories(row):
@@ -158,7 +138,7 @@ if st.button("Predict"):
         all_categories = [item['category'] for item in categorized if item['category'] is not None]
         df_cat = pd.Series(all_categories).value_counts()
 
-        # Display summary with colors below table
+        # Display summary with colors
         st.markdown("### Summary")
         for i, (cat, count) in enumerate(df_cat.items(), start=1):
             color = mcolors.TABLEAU_COLORS[list(mcolors.TABLEAU_COLORS.keys())[i % len(mcolors.TABLEAU_COLORS)]]
