@@ -69,46 +69,32 @@ def categorize_sentences(text):
         ],
     }
 
-    raw_sentences = tokenizer.tokenize(text)
-    sentences = []
-    for s in raw_sentences:
-        sentences.extend(re.split(r"[\n•-]+", s))
+    # Tokenize text into sentences
+    sentences = tokenizer.tokenize(text)
     sentences = [s.strip() for s in sentences if s.strip()]
 
     categorized_sentences = []
-    combined_text = ""
-    current_category = None
 
     for sent in sentences:
         sent_lower = sent.lower()
-        matched_category = None
-
+        matched_categories = []
+        # For each sentence, find ALL matching categories (in case multiple keywords appear)
         for category, keywords in categories.items():
             if any(re.search(rf"\b{re.escape(kw)}\b", sent_lower) for kw in keywords):
-                matched_category = category
-                break
-
-        if matched_category:
-            if current_category and current_category == matched_category:
-                combined_text += " " + sent
-            else:
-                if combined_text:
-                    categorized_sentences.append({"text": combined_text, "category": current_category})
-                combined_text = sent
-                current_category = matched_category
+                matched_categories.append(category)
+        # If sentence matches multiple categories, assign all categories (create one entry per category)
+        if matched_categories:
+            for cat in matched_categories:
+                categorized_sentences.append({"text": sent, "category": cat})
         else:
-            if current_category:
-                combined_text += " " + sent
-
-    if combined_text:
-        categorized_sentences.append({"text": combined_text, "category": current_category})
+            categorized_sentences.append({"text": sent, "category": "Uncategorized"})
 
     return categorized_sentences
 
 # --- STREAMLIT APP ---
 
-st.title("📄 CV Parsing and Text Classification")
-st.markdown("Easily extract and categorize text from CVs to identify education, experience, requirements, responsibilities, skills, and soft skills.")
+st.title("📄 CV Parsing and Job Description Classification")
+st.markdown("Extract text from CV and categorize sentences into education, experience, requirements, responsibilities, skills, and soft skills. You can also input Job Description and Qualifications for HR.")
 
 models = load_models()
 
@@ -120,12 +106,19 @@ if uploaded_file is not None:
     with uploaded_file:
         cv_text = extract_text_from_pdf(uploaded_file)
     if cv_text.strip():
-        st.text_area("Extracted Text:", cv_text, height=200)
+        st.text_area("Extracted CV Text:", cv_text, height=200)
     else:
         st.error("No text could be extracted from the uploaded file.")
 
+st.subheader("Job Description Input (from HR)")
+job_desc = st.text_area("Enter Job Description (responsibilities, tasks, etc.):", height=150)
+job_qual = st.text_area("Enter Job Qualifications:", height=150)
+
+# Combine all text inputs for prediction/categorization
+combined_text = cv_text + "\n" + job_desc + "\n" + job_qual
+
 st.subheader("Text Input for Classification")
-text = st.text_area("Enter text manually or use the extracted text above:", value=cv_text if cv_text.strip() else "")
+text = st.text_area("Enter text manually or edit combined text above:", value=combined_text if combined_text.strip() else "", height=200)
 
 model_choice = st.selectbox("Choose a model:", list(models.keys()))
 
@@ -142,7 +135,7 @@ if st.button("Predict"):
 
         # Convert categorized sentences to DataFrame
         df_categorized = pd.DataFrame(categorized)
-        df_categorized.index += 1  # Change index to start from 1
+        df_categorized.index += 1  # Start index at 1
 
         # Highlight categories in the DataFrame
         def highlight_categories(row):
@@ -153,6 +146,7 @@ if st.button("Predict"):
                 "Responsibility": "#FFDAC1",
                 "Skill": "#C1FFC1",
                 "SoftSkill": "#C1C1FF",
+                "Uncategorized": "#FFFFFF"
             }
             category_color = colors.get(row["category"], "#FFFFFF")
             return [f"background-color: {category_color};"] * len(row)
