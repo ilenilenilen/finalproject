@@ -40,7 +40,6 @@ def extract_text_from_pdf(file):
         return f"Error reading PDF: {e}"
 
 def categorize_sentences(text):
-    # Label utama saja
     categories = {
         "Education": ["education", "degree", "university", "bachelor", "master", "phd", "gpa"],
         "Experience": ["experience", "worked", "job", "position", "years", "intern"],
@@ -48,9 +47,7 @@ def categorize_sentences(text):
         "Responsibility": ["responsibility", "task", "duty", "role", "accountable", "responsible"],
         "Skill": [
             "skill", "expertise", "proficiency", "tools", "excel",
-            "project management", "research", "problem solving", "public speaking",
-            "machine learning", "data analysis", "feature engineering", "model deployment",
-            "algorithm", "python", "r", "sql", "tensorflow", "pytorch"
+            "project management", "research", "problem solving", "public speaking"
         ],
         "SoftSkill": ["communication", "leadership", "teamwork", "problem-solving", "advocacy", "relationship building"],
     }
@@ -91,27 +88,6 @@ def categorize_sentences(text):
 
     return categorized_sentences
 
-
-def check_senior_data_scientist_criteria(text):
-    """
-    Fungsi ini mengecek apakah CV memenuhi kriteria minimal seorang Senior Data Scientist
-    berdasarkan beberapa kata kunci penting.
-    """
-    keywords_mandatory = [
-        "master", "phd", "machine learning", "model deployment",
-        "feature engineering", "data analysis", "python", "statistics",
-        "5 years experience", "senior", "leadership", "project management"
-    ]
-
-    text_lower = text.lower()
-    missing_keywords = [kw for kw in keywords_mandatory if kw not in text_lower]
-
-    if len(missing_keywords) == 0:
-        return True, "CV memenuhi kriteria Senior Data Scientist."
-    else:
-        return False, f"CV kurang beberapa kriteria penting: {', '.join(missing_keywords)}"
-
-
 def match_cv_with_jd(cv_categories, jd_text):
     jd_categories = categorize_sentences(jd_text)
 
@@ -127,19 +103,33 @@ def match_cv_with_jd(cv_categories, jd_text):
 
         match_count = cv_df[(cv_df["category"] == jd_category) & (cv_df["text"].str.lower().str.contains(jd_text))].shape[0]
 
-        recommendation = (
-            "Good match" if match_count > 0 else "Consider adding more details for this category in the CV"
-        )
-
         match_results.append({
             "JD Category": jd_category,
             "JD Text": jd_row["text"],
-            "Matches in CV": match_count,
-            "Recommendation": recommendation
+            "Matches in CV": match_count
         })
 
     return pd.DataFrame(match_results)
 
+def visualize_category_distribution(categories):
+    category_counts = pd.Series([item['category'] for item in categories]).value_counts()
+
+    st.subheader("Category Distribution")
+    for i, (cat, count) in enumerate(category_counts.items(), start=1):
+        color = mcolors.TABLEAU_COLORS[list(mcolors.TABLEAU_COLORS.keys())[i % len(mcolors.TABLEAU_COLORS)]]
+        st.markdown(f"""
+            <div style="background-color: {color}; border-radius: 10px; padding: 10px; margin-bottom: 10px; color: white;">
+                <strong>{i}. {cat}</strong>: {count}
+            </div>
+        """, unsafe_allow_html=True)
+
+    # Pie chart for category distribution
+    st.subheader("Category Distribution (Pie Chart)")
+    fig, ax = plt.subplots()
+    colors = list(mcolors.TABLEAU_COLORS.values())[:len(category_counts)]
+    ax.pie(category_counts.values, labels=category_counts.index, colors=colors, autopct='%1.1f%%', startangle=90)
+    ax.axis('equal')
+    st.pyplot(fig)
 
 # --- STREAMLIT APP ---
 
@@ -162,6 +152,8 @@ if uploaded_file is not None:
 st.subheader("Job Description Input")
 jd_text = st.text_area("Enter the Job Description:")
 
+model_choice = st.selectbox("Choose a model:", list(models.keys()))
+
 if st.button("Analyze and Match"):
     if not cv_text.strip():
         st.warning("Please upload a CV.")
@@ -174,23 +166,18 @@ if st.button("Analyze and Match"):
         # Match CV with JD
         match_df = match_cv_with_jd(cv_categories, jd_text)
 
+        # Predict category if needed
+        prediction_text = st.text_area("Enter text for model prediction:", value="")
+        if prediction_text.strip():
+            model = models[model_choice]
+            prediction = model.predict([prediction_text])[0]
+            st.success(f"Prediction: {prediction}")
+
+        st.subheader("Categorized CV")
+        cv_df = pd.DataFrame(cv_categories)
+        st.dataframe(cv_df)
+
+        visualize_category_distribution(cv_categories)
+
         st.subheader("Matching Results")
         st.dataframe(match_df.style.highlight_max(subset=["Matches in CV"], color="lightgreen", axis=0))
-
-        # Check senior data scientist criteria
-        is_senior, message = check_senior_data_scientist_criteria(cv_text)
-        if is_senior:
-            st.success(message)
-        else:
-            st.warning(message)
-
-        # Optional visualization: Matching Distribution
-        st.subheader("Matching Distribution")
-        fig, ax = plt.subplots()
-        match_df["Matches in CV"].plot(kind="bar", ax=ax, color="skyblue", alpha=0.7, edgecolor="black")
-        ax.set_title("Number of Matches per JD Category")
-        ax.set_xlabel("Job Description Categories")
-        ax.set_ylabel("Matches in CV")
-        ax.set_xticks(range(len(match_df)))
-        ax.set_xticklabels(match_df["JD Category"], rotation=45, ha="right")
-        st.pyplot(fig)
