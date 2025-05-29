@@ -41,6 +41,15 @@ def extract_text_from_pdf(file):
 
 def categorize_sentences(text):
     categories = {
+        "Education": ["education", "degree", "university", "bachelor", "master", "phd", "gpa"],
+        "Experience": ["experience", "worked", "job", "position", "years", "intern"],
+        "Requirement": ["requirement", "mandatory", "qualification", "criteria", "must", "eligibility"],
+        "Responsibility": ["responsibility", "task", "duty", "role", "accountable", "responsible"],
+        "Skill": [
+            "skill", "expertise", "proficiency", "tools", "excel",
+            "project management", "research", "problem solving", "public speaking"
+        ],
+        "SoftSkill": [],
         "Model Development and Deployment": [
             "model", "deploy", "machine learning", "credit scoring", "risk evaluation",
             "business impact", "model implementation", "testing"
@@ -57,7 +66,7 @@ def categorize_sentences(text):
             "bachelor", "degree", "computer science", "mathematics", "statistics",
             "information system", "experience", "data scientist", "fintech",
             "finance services", "risk management", "machine learning", "analytical thinking"
-        ],
+        ]
     }
 
     raw_sentences = tokenizer.tokenize(text)
@@ -121,7 +130,7 @@ def match_cv_with_jd(cv_categories, jd_text):
 
 # --- STREAMLIT APP ---
 
-st.title("\ud83d\udcc4 CV Parsing and Job Description Matching")
+st.title("📄 CV Parsing and Job Description Matching")
 st.markdown("Easily extract and categorize text from CVs, and match them against job descriptions (JDs).")
 
 models = load_models()
