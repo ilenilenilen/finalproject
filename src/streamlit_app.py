@@ -41,17 +41,34 @@ def extract_text_from_pdf(file):
 
 def categorize_sentences(text):
     categories = {
-        "Education": ["education", "degree", "university", "bachelor", "master", "phd", "gpa"],
-        "Experience": ["experience", "worked", "job", "position", "years", "intern"],
-        "Requirement": ["requirement", "mandatory", "qualification", "criteria", "must", "eligibility"],
-        "Responsibility": ["responsibility", "task", "duty", "role", "accountable", "responsible"],
+        "Education": [
+            "education", "degree", "university", "bachelor", "master", "phd", "gpa",
+            "computer science", "mathematics", "statistics", "information system", "relevant major"
+        ],
+        "Experience": [
+            "experience", "worked", "job", "position", "years", "intern",
+            "5 years", "data science", "data scientist", "fintech", "finance services", "production environment"
+        ],
+        "Requirement": [
+            "requirement", "mandatory", "qualification", "criteria", "must", "eligibility",
+            "deep understanding", "strong analytical thinking", "proven experience", "advantage"
+        ],
+        "Responsibility": [
+            "responsibility", "task", "duty", "role", "accountable", "responsible",
+            "design", "build", "deploy", "perform testing", "model implementation", "fine tuning", "drive improvement"
+        ],
         "Skill": [
             "skill", "expertise", "proficiency", "tools", "excel",
-            "project management", "research", "problem solving", "public speaking"
+            "project management", "research", "problem solving", "public speaking",
+            "machine learning", "model development", "model deployment", "risk evaluation",
+            "business impact analysis", "feature engineering", "algorithm", "analysis"
         ],
-        "SoftSkill": ["communication", "leadership", "teamwork", "problem-solving", "advocacy", "relationship building"],
+        "SoftSkill": [
+            "communication", "leadership", "teamwork", "problem-solving", "advocacy", "relationship building",
+            "analytical thinking"
+        ],
     }
-    
+
     raw_sentences = tokenizer.tokenize(text)
     sentences = []
     for s in raw_sentences:
@@ -65,12 +82,12 @@ def categorize_sentences(text):
     for sent in sentences:
         sent_lower = sent.lower()
         matched_category = None
-        
+
         for category, keywords in categories.items():
-            if any(re.search(rf"\b{kw}\b", sent_lower) for kw in keywords):
+            if any(re.search(rf"\b{re.escape(kw)}\b", sent_lower) for kw in keywords):
                 matched_category = category
                 break
-        
+
         if matched_category:
             if current_category and current_category == matched_category:
                 combined_text += " " + sent
@@ -106,28 +123,6 @@ if uploaded_file is not None:
         st.text_area("Extracted Text:", cv_text, height=200)
     else:
         st.error("No text could be extracted from the uploaded file.")
-
-st.subheader("Job Description Input")
-default_jd_text = """Job Description
-a. Model Development and Deployment
-- Design, build, and deploy machine learning models for credit scoring. Perform risk evaluation and business impact analysis and making suggestion to Risk counterparts.
-- Develop and perform testing on model implementation logics.
-
-b. Feature Engineering and Model Improvement
-- Conduct analysis to improve model performance, through research in algorithms or feature engineering.
-
-c. Data Analysis and Insights
-- Work along with Risk counterparts to analysis portfolio and acquisition performance. Fine tuning Risk rule engines and drive improvement to implementation.
-
-Minimum Qualifications
-- Bachelor Degree in Computer Science, Mathematics, Statistics, Information System and/or other relevant major
-- Min. 5 years experience as Data Science/Data Scientist. Involve within the fintech or finance services industry and have an understanding of risk management would be an advantage
-- Deep understanding in machine learning is a must
-- Strong analytical thinking
-- Proven experience in developing and deploying machine learning models in a production environment
-"""
-
-jd_text = st.text_area("Enter the Job Description:", value=default_jd_text, height=300)
 
 st.subheader("Text Input for Classification")
 text = st.text_area("Enter text manually or use the extracted text above:", value=cv_text if cv_text.strip() else "")
@@ -185,7 +180,3 @@ if st.button("Predict"):
         ax.pie(df_cat.values, labels=df_cat.index, colors=colors, autopct='%1.1f%%', startangle=90)
         ax.axis('equal')
         st.pyplot(fig)
-
-        # Display JD Text for reference
-        st.subheader("Job Description")
-        st.text_area("Job Description Provided:", jd_text, height=200)
