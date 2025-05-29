@@ -40,6 +40,7 @@ def extract_text_from_pdf(file):
         return f"Error reading PDF: {e}"
 
 def categorize_sentences(text):
+    # Label utama saja
     categories = {
         "Education": ["education", "degree", "university", "bachelor", "master", "phd", "gpa"],
         "Experience": ["experience", "worked", "job", "position", "years", "intern"],
@@ -47,26 +48,11 @@ def categorize_sentences(text):
         "Responsibility": ["responsibility", "task", "duty", "role", "accountable", "responsible"],
         "Skill": [
             "skill", "expertise", "proficiency", "tools", "excel",
-            "project management", "research", "problem solving", "public speaking"
+            "project management", "research", "problem solving", "public speaking",
+            "machine learning", "data analysis", "feature engineering", "model deployment",
+            "algorithm", "python", "r", "sql", "tensorflow", "pytorch"
         ],
-        "SoftSkill": [],
-        "Model Development and Deployment": [
-            "model", "deploy", "machine learning", "credit scoring", "risk evaluation",
-            "business impact", "model implementation", "testing"
-        ],
-        "Feature Engineering and Model Improvement": [
-            "feature engineering", "model improvement", "algorithm", "performance",
-            "research", "analysis"
-        ],
-        "Data Analysis and Insights": [
-            "data analysis", "portfolio", "acquisition performance", "risk rule engines",
-            "implementation", "insights"
-        ],
-        "Minimum Qualifications": [
-            "bachelor", "degree", "computer science", "mathematics", "statistics",
-            "information system", "experience", "data scientist", "fintech",
-            "finance services", "risk management", "machine learning", "analytical thinking"
-        ]
+        "SoftSkill": ["communication", "leadership", "teamwork", "problem-solving", "advocacy", "relationship building"],
     }
 
     raw_sentences = tokenizer.tokenize(text)
@@ -105,6 +91,27 @@ def categorize_sentences(text):
 
     return categorized_sentences
 
+
+def check_senior_data_scientist_criteria(text):
+    """
+    Fungsi ini mengecek apakah CV memenuhi kriteria minimal seorang Senior Data Scientist
+    berdasarkan beberapa kata kunci penting.
+    """
+    keywords_mandatory = [
+        "master", "phd", "machine learning", "model deployment",
+        "feature engineering", "data analysis", "python", "statistics",
+        "5 years experience", "senior", "leadership", "project management"
+    ]
+
+    text_lower = text.lower()
+    missing_keywords = [kw for kw in keywords_mandatory if kw not in text_lower]
+
+    if len(missing_keywords) == 0:
+        return True, "CV memenuhi kriteria Senior Data Scientist."
+    else:
+        return False, f"CV kurang beberapa kriteria penting: {', '.join(missing_keywords)}"
+
+
 def match_cv_with_jd(cv_categories, jd_text):
     jd_categories = categorize_sentences(jd_text)
 
@@ -120,13 +127,19 @@ def match_cv_with_jd(cv_categories, jd_text):
 
         match_count = cv_df[(cv_df["category"] == jd_category) & (cv_df["text"].str.lower().str.contains(jd_text))].shape[0]
 
+        recommendation = (
+            "Good match" if match_count > 0 else "Consider adding more details for this category in the CV"
+        )
+
         match_results.append({
             "JD Category": jd_category,
             "JD Text": jd_row["text"],
-            "Matches in CV": match_count
+            "Matches in CV": match_count,
+            "Recommendation": recommendation
         })
 
     return pd.DataFrame(match_results)
+
 
 # --- STREAMLIT APP ---
 
@@ -163,3 +176,21 @@ if st.button("Analyze and Match"):
 
         st.subheader("Matching Results")
         st.dataframe(match_df.style.highlight_max(subset=["Matches in CV"], color="lightgreen", axis=0))
+
+        # Check senior data scientist criteria
+        is_senior, message = check_senior_data_scientist_criteria(cv_text)
+        if is_senior:
+            st.success(message)
+        else:
+            st.warning(message)
+
+        # Optional visualization: Matching Distribution
+        st.subheader("Matching Distribution")
+        fig, ax = plt.subplots()
+        match_df["Matches in CV"].plot(kind="bar", ax=ax, color="skyblue", alpha=0.7, edgecolor="black")
+        ax.set_title("Number of Matches per JD Category")
+        ax.set_xlabel("Job Description Categories")
+        ax.set_ylabel("Matches in CV")
+        ax.set_xticks(range(len(match_df)))
+        ax.set_xticklabels(match_df["JD Category"], rotation=45, ha="right")
+        st.pyplot(fig)
