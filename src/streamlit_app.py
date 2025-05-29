@@ -43,7 +43,7 @@ def check_match(sentence, job_text):
     """Cek apakah kalimat mengandung kata/frasa yang ada di job_text."""
     sent_lower = sentence.lower()
     job_lower = job_text.lower()
-    # Sederhana: cek apakah ada minimal 1 kata kalimat ada di job_text
+    # Cek minimal 1 kata kalimat ada di job_text
     return any(word in job_lower for word in sent_lower.split())
 
 def categorize_sentences(text):
@@ -87,11 +87,10 @@ def categorize_sentences(text):
         for category, keywords in categories.items():
             if any(re.search(rf"\b{re.escape(kw)}\b", sent_lower) for kw in keywords):
                 matched_categories.append(category)
+        # Hanya simpan kalimat yang ada kategori (exclude uncategorized)
         if matched_categories:
             for cat in matched_categories:
                 categorized_sentences.append({"text": sent, "category": cat})
-        else:
-            categorized_sentences.append({"text": sent, "category": "Uncategorized"})
 
     return categorized_sentences
 
@@ -139,58 +138,56 @@ if st.button("Predict and Match"):
 
         categorized = categorize_sentences(text_for_classification)
 
-        # Tambahkan kolom 'match_with_job_desc' untuk cek kecocokan tiap kalimat kategori dengan job_desc+qual
-        for item in categorized:
-            if job_text_combined:
-                item["match_with_job_desc"] = check_match(item["text"], job_text_combined)
-            else:
-                item["match_with_job_desc"] = False
+        # Filter kalimat yang match dengan job desc & qual saja
+        if job_text_combined:
+            filtered = []
+            for item in categorized:
+                if check_match(item["text"], job_text_combined):
+                    filtered.append({**item, "match_with_job_desc": True})
+        else:
+            # Jika job desc kosong, tampilkan semua kategori tapi tanpa match
+            filtered = [{**item, "match_with_job_desc": False} for item in categorized]
 
-        df_categorized = pd.DataFrame(categorized)
-        df_categorized.index += 1
+        df_categorized = pd.DataFrame(filtered)
+        if df_categorized.empty:
+            st.info("No categorized sentences from CV match the Job Description and Qualifications.")
+        else:
+            df_categorized.index += 1
 
-        def highlight_categories(row):
-            colors = {
-                "Education": "#FFDDC1",
-                "Experience": "#FFC1C1",
-                "Requirement": "#C1E1FF",
-                "Responsibility": "#FFDAC1",
-                "Skill": "#C1FFC1",
-                "SoftSkill": "#C1C1FF",
-                "Uncategorized": "#FFFFFF"
-            }
-            base_color = colors.get(row["category"], "#FFFFFF")
-            # Jika match dengan job desc, beri highlight hijau muda
-            if row["match_with_job_desc"]:
-                return [f"background-color: #B2FFB2;"] * len(row)
-            else:
-                return [f"background-color: {base_color};"] * len(row)
+            def highlight_categories(row):
+                colors = {
+                    "Education": "#FFDDC1",
+                    "Experience": "#FFC1C1",
+                    "Requirement": "#C1E1FF",
+                    "Responsibility": "#FFDAC1",
+                    "Skill": "#C1FFC1",
+                    "SoftSkill": "#C1C1FF",
+                }
+                base_color = colors.get(row["category"], "#FFFFFF")
+                # Highlight hijau muda jika match
+                if row["match_with_job_desc"]:
+                    return [f"background-color: #B2FFB2;"] * len(row)
+                else:
+                    return [f"background-color: {base_color};"] * len(row)
 
-        st.subheader("CV Categorization with Job Description Match Highlight")
-        st.dataframe(df_categorized.style.apply(highlight_categories, axis=1, subset=["category", "text", "match_with_job_desc"]))
+            st.subheader("CV Categorization Matching Job Description")
+            st.dataframe(df_categorized.style.apply(highlight_categories, axis=1, subset=["category", "text", "match_with_job_desc"]))
 
-        # Summary kategori CV saja
-        all_categories = df_categorized["category"].tolist()
-        df_cat = pd.Series(all_categories).value_counts()
+            # Summary kategori hanya kalimat yang match job desc & qual
+            df_cat = df_categorized["category"].value_counts()
 
-        st.markdown("### Summary of CV Text Categories")
-        for i, (cat, count) in enumerate(df_cat.items(), start=1):
-            color = mcolors.TABLEAU_COLORS[list(mcolors.TABLEAU_COLORS.keys())[i % len(mcolors.TABLEAU_COLORS)]]
-            st.markdown(f"""
-                <div style="background-color: {color}; border-radius: 10px; padding: 10px; margin-bottom: 10px; color: white;">
-                    <strong>{i}. {cat}</strong>: {count}
-                </div>
-            """, unsafe_allow_html=True)
+            st.markdown("### Summary of CV Categories Matching Job Description")
+            for i, (cat, count) in enumerate(df_cat.items(), start=1):
+                color = mcolors.TABLEAU_COLORS[list(mcolors.TABLEAU_COLORS.keys())[i % len(mcolors.TABLEAU_COLORS)]]
+                st.markdown(f"""
+                    <div style="background-color: {color}; border-radius: 10px; padding: 10px; margin-bottom: 10px; color: white;">
+                        <strong>{i}. {cat}</strong>: {count}
+                    </div>
+                """, unsafe_allow_html=True)
 
-        st.subheader("Category Distribution (Pie Chart) for CV Text Only")
-        fig, ax = plt.subplots()
-        colors = list(mcolors.TABLEAU_COLORS.values())[:len(df_cat)]
-        ax.pie(df_cat.values, labels=df_cat.index, colors=colors, autopct='%1.1f%%', startangle=90)
-        ax.axis('equal')
-        st.pyplot(fig)
-
-st.subheader("Job Description and Qualifications (Not Categorized)")
-st.markdown("**Job Description:**")
-st.write(job_desc if job_desc.strip() else "_No job description provided._")
-st.markdown("**Job Qualifications:**")
-st.write(job_qual if job_qual.strip() else "_No job qualifications provided._")
+            st.subheader("Category Distribution (Pie Chart) for CV Text Matching Job Description")
+            fig, ax = plt.subplots()
+            colors = list(mcolors.TABLEAU_COLORS.values())[:len(df_cat)]
+            ax.pie(df_cat.values, labels=df_cat.index, colors=colors, autopct='%1.1f%%', startangle=90)
+            ax.axis('equal')
+            st.pyplot(fig)
