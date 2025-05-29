@@ -51,11 +51,11 @@ def categorize_sentences(text):
         ],
         "SoftSkill": ["communication", "leadership", "teamwork", "problem-solving", "advocacy", "relationship building"],
     }
-
+    
     raw_sentences = tokenizer.tokenize(text)
     sentences = []
     for s in raw_sentences:
-        sentences.extend(re.split(r"[\n\u2022\-]+", s))
+        sentences.extend(re.split(r"[\n•-]+", s))
     sentences = [s.strip() for s in sentences if s.strip()]
 
     categorized_sentences = []
@@ -65,12 +65,12 @@ def categorize_sentences(text):
     for sent in sentences:
         sent_lower = sent.lower()
         matched_category = None
-
+        
         for category, keywords in categories.items():
             if any(re.search(rf"\b{kw}\b", sent_lower) for kw in keywords):
                 matched_category = category
                 break
-
+        
         if matched_category:
             if current_category and current_category == matched_category:
                 combined_text += " " + sent
@@ -88,96 +88,104 @@ def categorize_sentences(text):
 
     return categorized_sentences
 
-def match_cv_with_jd(cv_categories, jd_text):
-    jd_categories = categorize_sentences(jd_text)
-
-    # Create a DataFrame to compare
-    cv_df = pd.DataFrame(cv_categories)
-    jd_df = pd.DataFrame(jd_categories)
-
-    # Check matches
-    match_results = []
-    for _, jd_row in jd_df.iterrows():
-        jd_text = jd_row["text"].lower()
-        jd_category = jd_row["category"]
-
-        match_count = cv_df[(cv_df["category"] == jd_category) & (cv_df["text"].str.lower().str.contains(jd_text))].shape[0]
-
-        match_results.append({
-            "JD Category": jd_category,
-            "JD Text": jd_row["text"],
-            "Matches in CV": match_count
-        })
-
-    return pd.DataFrame(match_results)
-
-def visualize_category_distribution(categories):
-    category_counts = pd.Series([item['category'] for item in categories]).value_counts()
-
-    st.subheader("Category Distribution")
-    for i, (cat, count) in enumerate(category_counts.items(), start=1):
-        color = mcolors.TABLEAU_COLORS[list(mcolors.TABLEAU_COLORS.keys())[i % len(mcolors.TABLEAU_COLORS)]]
-        st.markdown(f"""
-            <div style="background-color: {color}; border-radius: 10px; padding: 10px; margin-bottom: 10px; color: white;">
-                <strong>{i}. {cat}</strong>: {count}
-            </div>
-        """, unsafe_allow_html=True)
-
-    # Pie chart for category distribution
-    st.subheader("Category Distribution (Pie Chart)")
-    fig, ax = plt.subplots()
-    colors = list(mcolors.TABLEAU_COLORS.values())[:len(category_counts)]
-    ax.pie(category_counts.values, labels=category_counts.index, colors=colors, autopct='%1.1f%%', startangle=90)
-    ax.axis('equal')
-    st.pyplot(fig)
-
 # --- STREAMLIT APP ---
 
-st.title("📄 CV Parsing and Job Description Matching")
-st.markdown("Easily extract and categorize text from CVs, and match them against job descriptions (JDs).")
+st.title("📄 CV Parsing and Text Classification")
+st.markdown("Easily extract and categorize text from CVs to identify education, experience, requirements, responsibilities, skills, and soft skills.")
 
 models = load_models()
 
 uploaded_file = st.file_uploader("Upload your CV (PDF format only):", type=["pdf"])
 
 cv_text = ""
+
 if uploaded_file is not None:
     with uploaded_file:
         cv_text = extract_text_from_pdf(uploaded_file)
     if cv_text.strip():
-        st.text_area("Extracted CV Text:", cv_text, height=200)
+        st.text_area("Extracted Text:", cv_text, height=200)
     else:
         st.error("No text could be extracted from the uploaded file.")
 
 st.subheader("Job Description Input")
-jd_text = st.text_area("Enter the Job Description:")
+default_jd_text = """Job Description
+a. Model Development and Deployment
+- Design, build, and deploy machine learning models for credit scoring. Perform risk evaluation and business impact analysis and making suggestion to Risk counterparts.
+- Develop and perform testing on model implementation logics.
+
+b. Feature Engineering and Model Improvement
+- Conduct analysis to improve model performance, through research in algorithms or feature engineering.
+
+c. Data Analysis and Insights
+- Work along with Risk counterparts to analysis portfolio and acquisition performance. Fine tuning Risk rule engines and drive improvement to implementation.
+
+Minimum Qualifications
+- Bachelor Degree in Computer Science, Mathematics, Statistics, Information System and/or other relevant major
+- Min. 5 years experience as Data Science/Data Scientist. Involve within the fintech or finance services industry and have an understanding of risk management would be an advantage
+- Deep understanding in machine learning is a must
+- Strong analytical thinking
+- Proven experience in developing and deploying machine learning models in a production environment
+"""
+
+jd_text = st.text_area("Enter the Job Description:", value=default_jd_text, height=300)
+
+st.subheader("Text Input for Classification")
+text = st.text_area("Enter text manually or use the extracted text above:", value=cv_text if cv_text.strip() else "")
 
 model_choice = st.selectbox("Choose a model:", list(models.keys()))
 
-if st.button("Analyze and Match"):
-    if not cv_text.strip():
-        st.warning("Please upload a CV.")
-    elif not jd_text.strip():
-        st.warning("Please enter a Job Description.")
+if st.button("Predict"):
+    if not text.strip():
+        st.warning("Please enter or select some text.")
     else:
-        # Categorize CV text
-        cv_categories = categorize_sentences(cv_text)
+        model = models[model_choice]
+        prediction = model.predict([text])[0]
+        st.success(f"Prediction: {prediction}")
 
-        # Match CV with JD
-        match_df = match_cv_with_jd(cv_categories, jd_text)
+        st.subheader("Categorization Per Sentence")
+        categorized = categorize_sentences(text)
 
-        # Predict category if needed
-        prediction_text = st.text_area("Enter text for model prediction:", value="")
-        if prediction_text.strip():
-            model = models[model_choice]
-            prediction = model.predict([prediction_text])[0]
-            st.success(f"Prediction: {prediction}")
+        # Convert categorized sentences to DataFrame
+        df_categorized = pd.DataFrame(categorized)
+        df_categorized.index += 1  # Change index to start from 1
 
-        st.subheader("Categorized CV")
-        cv_df = pd.DataFrame(cv_categories)
-        st.dataframe(cv_df)
+        # Highlight categories in the DataFrame
+        def highlight_categories(row):
+            colors = {
+                "Education": "#FFDDC1",
+                "Experience": "#FFC1C1",
+                "Requirement": "#C1E1FF",
+                "Responsibility": "#FFDAC1",
+                "Skill": "#C1FFC1",
+                "SoftSkill": "#C1C1FF",
+            }
+            category_color = colors.get(row["category"], "#FFFFFF")
+            return [f"background-color: {category_color};"] * len(row)
 
-        visualize_category_distribution(cv_categories)
+        st.dataframe(df_categorized.style.apply(highlight_categories, axis=1, subset=["category", "text"]))
 
-        st.subheader("Matching Results")
-        st.dataframe(match_df.style.highlight_max(subset=["Matches in CV"], color="lightgreen", axis=0))
+        # Generate category distribution and summary
+        all_categories = [item['category'] for item in categorized]
+        df_cat = pd.Series(all_categories).value_counts()
+
+        # Display summary with colors
+        st.markdown("### Summary")
+        for i, (cat, count) in enumerate(df_cat.items(), start=1):
+            color = mcolors.TABLEAU_COLORS[list(mcolors.TABLEAU_COLORS.keys())[i % len(mcolors.TABLEAU_COLORS)]]
+            st.markdown(f"""
+                <div style="background-color: {color}; border-radius: 10px; padding: 10px; margin-bottom: 10px; color: white;">
+                    <strong>{i}. {cat}</strong>: {count}
+                </div>
+            """, unsafe_allow_html=True)
+
+        # Pie chart for category distribution
+        st.subheader("Category Distribution (Pie Chart)")
+        fig, ax = plt.subplots()
+        colors = list(mcolors.TABLEAU_COLORS.values())[:len(df_cat)]
+        ax.pie(df_cat.values, labels=df_cat.index, colors=colors, autopct='%1.1f%%', startangle=90)
+        ax.axis('equal')
+        st.pyplot(fig)
+
+        # Display JD Text for reference
+        st.subheader("Job Description")
+        st.text_area("Job Description Provided:", jd_text, height=200)
