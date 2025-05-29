@@ -39,6 +39,13 @@ def extract_text_from_pdf(file):
     except Exception as e:
         return f"Error reading PDF: {e}"
 
+def check_match(sentence, job_text):
+    """Cek apakah kalimat mengandung kata/frasa yang ada di job_text."""
+    sent_lower = sentence.lower()
+    job_lower = job_text.lower()
+    # Sederhana: cek apakah ada minimal 1 kata kalimat ada di job_text
+    return any(word in job_lower for word in sent_lower.split())
+
 def categorize_sentences(text):
     categories = {
         "Education": [
@@ -69,7 +76,6 @@ def categorize_sentences(text):
         ],
     }
 
-    # Tokenize text into sentences
     sentences = tokenizer.tokenize(text)
     sentences = [s.strip() for s in sentences if s.strip()]
 
@@ -78,11 +84,9 @@ def categorize_sentences(text):
     for sent in sentences:
         sent_lower = sent.lower()
         matched_categories = []
-        # For each sentence, find ALL matching categories (in case multiple keywords appear)
         for category, keywords in categories.items():
             if any(re.search(rf"\b{re.escape(kw)}\b", sent_lower) for kw in keywords):
                 matched_categories.append(category)
-        # If sentence matches multiple categories, assign all categories (create one entry per category)
         if matched_categories:
             for cat in matched_categories:
                 categorized_sentences.append({"text": sent, "category": cat})
@@ -91,10 +95,10 @@ def categorize_sentences(text):
 
     return categorized_sentences
 
+
 # --- STREAMLIT APP ---
 
-st.title("📄 CV Parsing and Job Description Classification")
-st.markdown("Extract text from CV and categorize sentences into education, experience, requirements, responsibilities, skills, and soft skills. You can also input Job Description and Qualifications for HR.")
+st.title("📄 CV Parsing with Job Description Matching")
 
 models = load_models()
 
@@ -114,30 +118,37 @@ st.subheader("Job Description Input (from HR)")
 job_desc = st.text_area("Enter Job Description (responsibilities, tasks, etc.):", height=150)
 job_qual = st.text_area("Enter Job Qualifications:", height=150)
 
-# Combine all text inputs for prediction/categorization
-combined_text = cv_text + "\n" + job_desc + "\n" + job_qual
+job_text_combined = (job_desc + " " + job_qual).strip()
 
 st.subheader("Text Input for Classification")
-text = st.text_area("Enter text manually or edit combined text above:", value=combined_text if combined_text.strip() else "", height=200)
+text_for_classification = st.text_area(
+    "Enter CV text manually or use extracted CV text above:",
+    value=cv_text if cv_text.strip() else "",
+    height=200,
+)
 
 model_choice = st.selectbox("Choose a model:", list(models.keys()))
 
-if st.button("Predict"):
-    if not text.strip():
-        st.warning("Please enter or select some text.")
+if st.button("Predict and Match"):
+    if not text_for_classification.strip():
+        st.warning("Please enter or select some CV text for classification.")
     else:
         model = models[model_choice]
-        prediction = model.predict([text])[0]
+        prediction = model.predict([text_for_classification])[0]
         st.success(f"Prediction: {prediction}")
 
-        st.subheader("Categorization Per Sentence")
-        categorized = categorize_sentences(text)
+        categorized = categorize_sentences(text_for_classification)
 
-        # Convert categorized sentences to DataFrame
+        # Tambahkan kolom 'match_with_job_desc' untuk cek kecocokan tiap kalimat kategori dengan job_desc+qual
+        for item in categorized:
+            if job_text_combined:
+                item["match_with_job_desc"] = check_match(item["text"], job_text_combined)
+            else:
+                item["match_with_job_desc"] = False
+
         df_categorized = pd.DataFrame(categorized)
-        df_categorized.index += 1  # Start index at 1
+        df_categorized.index += 1
 
-        # Highlight categories in the DataFrame
         def highlight_categories(row):
             colors = {
                 "Education": "#FFDDC1",
@@ -148,17 +159,21 @@ if st.button("Predict"):
                 "SoftSkill": "#C1C1FF",
                 "Uncategorized": "#FFFFFF"
             }
-            category_color = colors.get(row["category"], "#FFFFFF")
-            return [f"background-color: {category_color};"] * len(row)
+            base_color = colors.get(row["category"], "#FFFFFF")
+            # Jika match dengan job desc, beri highlight hijau muda
+            if row["match_with_job_desc"]:
+                return [f"background-color: #B2FFB2;"] * len(row)
+            else:
+                return [f"background-color: {base_color};"] * len(row)
 
-        st.dataframe(df_categorized.style.apply(highlight_categories, axis=1, subset=["category", "text"]))
+        st.subheader("CV Categorization with Job Description Match Highlight")
+        st.dataframe(df_categorized.style.apply(highlight_categories, axis=1, subset=["category", "text", "match_with_job_desc"]))
 
-        # Generate category distribution and summary
-        all_categories = [item['category'] for item in categorized]
+        # Summary kategori CV saja
+        all_categories = df_categorized["category"].tolist()
         df_cat = pd.Series(all_categories).value_counts()
 
-        # Display summary with colors
-        st.markdown("### Summary")
+        st.markdown("### Summary of CV Text Categories")
         for i, (cat, count) in enumerate(df_cat.items(), start=1):
             color = mcolors.TABLEAU_COLORS[list(mcolors.TABLEAU_COLORS.keys())[i % len(mcolors.TABLEAU_COLORS)]]
             st.markdown(f"""
@@ -167,10 +182,15 @@ if st.button("Predict"):
                 </div>
             """, unsafe_allow_html=True)
 
-        # Pie chart for category distribution
-        st.subheader("Category Distribution (Pie Chart)")
+        st.subheader("Category Distribution (Pie Chart) for CV Text Only")
         fig, ax = plt.subplots()
         colors = list(mcolors.TABLEAU_COLORS.values())[:len(df_cat)]
         ax.pie(df_cat.values, labels=df_cat.index, colors=colors, autopct='%1.1f%%', startangle=90)
         ax.axis('equal')
         st.pyplot(fig)
+
+st.subheader("Job Description and Qualifications (Not Categorized)")
+st.markdown("**Job Description:**")
+st.write(job_desc if job_desc.strip() else "_No job description provided._")
+st.markdown("**Job Qualifications:**")
+st.write(job_qual if job_qual.strip() else "_No job qualifications provided._")
