@@ -40,10 +40,9 @@ def extract_text_from_pdf(file):
         return f"Error reading PDF: {e}"
 
 def check_match(sentence, job_text):
-    """Cek apakah kalimat mengandung kata/frasa yang ada di job_text."""
+    """Check if the sentence matches the job text."""
     sent_lower = sentence.lower()
     job_lower = job_text.lower()
-    # Cek minimal 1 kata kalimat ada di job_text
     return any(word in job_lower for word in sent_lower.split())
 
 def categorize_sentences(text):
@@ -54,25 +53,27 @@ def categorize_sentences(text):
         ],
         "Experience": [
             "experience", "worked", "job", "position", "years", "intern",
-            "5 years", "data science", "data scientist", "fintech", "finance services", "production environment"
+            "data collection", "data cleaning", "data organization", "data analysis", "dashboard development",
+            "report creation", "business intelligence", "collaboration", "teamwork"
         ],
         "Requirement": [
             "requirement", "mandatory", "qualification", "criteria", "must", "eligibility",
-            "deep understanding", "strong analytical thinking", "proven experience", "advantage"
+            "proficiency", "data analysis tools", "advanced statistics", "problem solving",
+            "business acumen", "detail-oriented", "best practices"
         ],
         "Responsibility": [
             "responsibility", "task", "duty", "role", "accountable", "responsible",
-            "design", "build", "deploy", "perform testing", "model implementation", "fine tuning", "drive improvement"
+            "collecting data", "cleaning data", "organizing data", "performing advanced analysis",
+            "developing dashboards", "reporting insights", "collaborating with teams", "improving processes"
         ],
         "Skill": [
-            "skill", "expertise", "proficiency", "tools", "excel",
-            "project management", "research", "problem solving", "public speaking",
-            "machine learning", "model development", "model deployment", "risk evaluation",
-            "business impact analysis", "feature engineering", "algorithm", "analysis"
+            "skill", "expertise", "proficiency", "tools", "excel", "data visualization",
+            "power bi", "tableau", "sql", "python", "r programming", "machine learning basics",
+            "statistical modeling", "data storytelling", "presentation skills"
         ],
         "SoftSkill": [
-            "communication", "leadership", "teamwork", "problem-solving", "advocacy", "relationship building",
-            "analytical thinking"
+            "communication", "leadership", "teamwork", "problem-solving", "collaboration",
+            "analytical thinking", "time management", "critical thinking", "adaptability"
         ],
     }
 
@@ -87,13 +88,11 @@ def categorize_sentences(text):
         for category, keywords in categories.items():
             if any(re.search(rf"\b{re.escape(kw)}\b", sent_lower) for kw in keywords):
                 matched_categories.append(category)
-        # Hanya simpan kalimat yang ada kategori (exclude uncategorized)
         if matched_categories:
             for cat in matched_categories:
                 categorized_sentences.append({"text": sent, "category": cat})
 
     return categorized_sentences
-
 
 # --- STREAMLIT APP ---
 
@@ -138,14 +137,13 @@ if st.button("Predict and Match"):
 
         categorized = categorize_sentences(text_for_classification)
 
-        # Filter kalimat yang match dengan job desc & qual saja
+        # Filter sentences that match the job description
         if job_text_combined:
             filtered = []
             for item in categorized:
                 if check_match(item["text"], job_text_combined):
                     filtered.append({**item, "match_with_job_desc": True})
         else:
-            # Jika job desc kosong, tampilkan semua kategori tapi tanpa match
             filtered = [{**item, "match_with_job_desc": False} for item in categorized]
 
         df_categorized = pd.DataFrame(filtered)
@@ -164,7 +162,6 @@ if st.button("Predict and Match"):
                     "SoftSkill": "#C1C1FF",
                 }
                 base_color = colors.get(row["category"], "#FFFFFF")
-                # Highlight hijau muda jika match
                 if row["match_with_job_desc"]:
                     return [f"background-color: #B2FFB2;"] * len(row)
                 else:
@@ -173,7 +170,7 @@ if st.button("Predict and Match"):
             st.subheader("CV Categorization Matching Job Description")
             st.dataframe(df_categorized.style.apply(highlight_categories, axis=1, subset=["category", "text", "match_with_job_desc"]))
 
-            # Summary kategori hanya kalimat yang match job desc & qual
+            # Summary of categories
             df_cat = df_categorized["category"].value_counts()
 
             st.markdown("### Summary of CV Categories Matching Job Description")
