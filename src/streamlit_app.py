@@ -48,7 +48,7 @@ def to_excel(df):
     return output.getvalue()
 
 # --- Streamlit App ---
-st.title("📄 CV Parsing and Job Description Matching (AgGrid Fix)")
+st.title("📄 Job Description Classification Text")
 
 models = load_models()
 
@@ -79,7 +79,7 @@ model_choice = st.selectbox("Choose a model:", list(models.keys()))
 if "df_results" not in st.session_state:
     st.session_state.df_results = None
 
-if st.button("Predict and Match"):
+if st.button("Predict"):
     if not text_for_classification.strip():
         st.warning("Please enter or select some CV text for classification.")
     else:
