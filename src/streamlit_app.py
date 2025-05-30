@@ -1,4 +1,4 @@
-# --- Library Imports ---
+#Import Library
 import os
 import io
 import joblib
@@ -11,20 +11,25 @@ import nltk
 from nltk.tokenize.punkt import PunktSentenceTokenizer
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 
-# --- Tokenizer Setup ---
+#Download model tokenizer
 nltk.download("punkt", quiet=True)
+#Membuat instance tokenizer untuk teks
 tokenizer = PunktSentenceTokenizer()
 
-# --- Model Directory ---
+#Mendapatkan path direktori skrip untuk memuat model
 MODEL_DIR = os.path.dirname(os.path.abspath(__file__))
 
+#Cache Models
 @st.cache_resource
 def load_models():
     return {
         "Logistic Regression": joblib.load(os.path.join(MODEL_DIR, "lr_model.pkl")),
         "Naive Bayes": joblib.load(os.path.join(MODEL_DIR, "nb_model.pkl")),
+        #"SVM": joblib.load(os.path.join(MODEL_DIR, "svm_model.pkl")),
+        #"Ensemble": joblib.load(os.path.join(MODEL_DIR, "ensemble_model.pkl")),
     }
 
+#Extract text from PDF
 def extract_text_from_pdf(file):
     try:
         pdf_reader = PyPDF2.PdfReader(file)
@@ -37,10 +42,14 @@ def extract_text_from_pdf(file):
     except Exception as e:
         return f"Error reading PDF: {e}"
 
+#sentence categorization sentence
 def categorize_sentences(text):
+    #Membagi teks menjadi kalimat
     sentences = tokenizer.tokenize(text)
+    #Menghapus kalimat kosong
     return [s.strip() for s in sentences if s.strip()]
 
+#Dataframe to excel function
 def to_excel(df):
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
@@ -52,7 +61,7 @@ st.title("📄 Job Description Classification Text")
 
 models = load_models()
 
-# --- File Upload ---
+#Mengunggah file
 uploaded_file = st.file_uploader("Upload your CV (PDF format only):", type=["pdf"])
 cv_text = ""
 if uploaded_file is not None:
@@ -63,6 +72,7 @@ if uploaded_file is not None:
     else:
         st.error("No text could be extracted from the uploaded file.")
 
+#Job description
 st.subheader("Job Description Input")
 job_desc = st.text_area("Enter Job Description:", height=150)
 
@@ -75,7 +85,7 @@ text_for_classification = st.text_area(
 
 model_choice = st.selectbox("Choose a model:", list(models.keys()))
 
-# --- Initialize Session State ---
+#Initialize session state
 if "df_results" not in st.session_state:
     st.session_state.df_results = None
 
@@ -95,7 +105,7 @@ if st.button("Predict"):
 
         st.session_state.df_results = df_results
 
-# --- AgGrid and Output Display ---
+#AgGrid and ouput display
 if st.session_state.df_results is not None:
     st.subheader("Categorized Sentences with Predictions (Editable)")
     gb = GridOptionsBuilder.from_dataframe(st.session_state.df_results)
@@ -117,7 +127,7 @@ if st.session_state.df_results is not None:
     if grid_response['data'] is not None:
         st.session_state.df_results = pd.DataFrame(grid_response['data'])
 
-    # --- Summary ---
+    #Summary
     df_cat = st.session_state.df_results["Prediction"].value_counts()
     st.subheader("Summary of Predictions")
     for i, (cat, count) in enumerate(df_cat.items(), start=1):
@@ -128,7 +138,7 @@ if st.session_state.df_results is not None:
             unsafe_allow_html=True,
         )
 
-    # --- Pie Chart ---
+    #Pie chart
     st.subheader("Prediction Distribution (Pie Chart)")
     fig, ax = plt.subplots()
     colors = list(mcolors.TABLEAU_COLORS.values())[:len(df_cat)]
@@ -136,7 +146,7 @@ if st.session_state.df_results is not None:
     ax.axis("equal")
     st.pyplot(fig)
 
-    # --- Excel Download ---
+    #Excel download
     st.download_button(
         label="📥 Download Predictions + Manual Match (Excel)",
         data=to_excel(st.session_state.df_results),
