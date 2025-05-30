@@ -6,3 +6,5 @@ scikit-learn
 PyPDF2
 matplotlib
 nltk
+xlsxwriter
+streamlit-aggrid
