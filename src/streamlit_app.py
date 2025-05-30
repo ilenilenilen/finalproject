@@ -67,7 +67,7 @@ def categorize_sentences(text):
     return categorized_sentences
 
 # STREAMLIT APP
-st.title("\ud83d\udcc4 CV Parsing with Job Description Matching")
+st.title("CV Parsing with Job Description Matching")
 
 models = load_models()
 
