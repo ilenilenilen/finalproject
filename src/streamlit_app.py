@@ -11,7 +11,7 @@ import nltk
 from nltk.tokenize.punkt import PunktSentenceTokenizer
 
 # Download 'punkt' tokenizer
-nltk.download ('punk', quiet = True)
+nltk.download('punkt', quiet=True)
 
 # Initialize the Punkt tokenizer explicitly
 tokenizer = PunktSentenceTokenizer()
@@ -27,7 +27,7 @@ def load_models():
         "SVM": joblib.load(os.path.join(MODEL_DIR, "svm_model.pkl")),
     }
 
-#Extract file from PDF
+# Extract file from PDF
 def extract_text_from_pdf(file):
     try:
         pdf_reader = PyPDF2.PdfReader(file)
@@ -39,51 +39,40 @@ def extract_text_from_pdf(file):
         return text
     except Exception as e:
         return f"Error reading PDF: {e}"
- 
-def check_match(sentence, job_text):
-    """Check if a sentence contains words or phrases relevant to the job description text."""
-    sent_lower = sentence.lower()
-    job_lower = job_text.lower()
-    #Check if at least one word in the sentence exists in thejob description text
-    return any(word in job_lower for word in sent_lower.split())
 
 def categorize_sentences(text):
-    #Define categories and their corresponding keywords
-    categories ={
-        "Education":[
-            "education","degree","university","bachelor","master","phd","gpa",
-            "computer science","mathematics","statistics","information system","relevant major"
+    categories = {
+        "Education": [
+            "education", "degree", "university", "bachelor", "master", "phd", "gpa",
+            "computer science", "mathematics", "statistics", "information system", "relevant major"
         ],
-        "Experience":[
-            "experience","worked","job","position","years","intern",
-            "5 years","data science","data scientist","fintech","finance services",
+        "Experience": [
+            "experience", "worked", "job", "position", "years", "intern",
+            "5 years", "data science", "data scientist", "fintech", "finance services",
             "production environment"
         ],
-        "Requirement":[
+        "Requirement": [
             "requirement", "mandatory", "qualification", "criteria", "must", "eligibility",
             "deep understanding", "strong analytical thinking", "proven experience", "advantage"
         ],
-        "Responsibility":[
-            "responsibility","task","duty","role","accountable","responsible",
-            "design","build","deploy","perform testing","model implementation",
-            "fine tuning","drive improvement"
+        "Responsibility": [
+            "responsibility", "task", "duty", "role", "accountable", "responsible",
+            "design", "build", "deploy", "perform testing", "model implementation",
+            "fine tuning", "drive improvement"
         ],
-        "Skill":[
-            "skill","expertise","proficiency","tools","excel",
-            "project management","research","problem solving","public speaking",
-            "machine learning","model development","model deployment","risk evaluation",
-            "business impact analysis","feature engineering","algorithm","analysis"
+        "Skill": [
+            "skill", "expertise", "proficiency", "tools", "excel",
+            "project management", "research", "problem solving", "public speaking",
+            "machine learning", "model development", "model deployment", "risk evaluation",
+            "business impact analysis", "feature engineering", "algorithm", "analysis"
         ],
         "SoftSkill": [
-            "communication","leadership","teamwork","problem-solving","advocacy",
-            "relationship building","analytical thinking"
+            "communication", "leadership", "teamwork", "problem-solving", "advocacy",
+            "relationship building", "analytical thinking"
         ],
     }
 
-    #Tokenize the input text into individual sentences
     sentences = tokenizer.tokenize(text)
-
-    #Remove loading and trailing whitespaces and filter out empty sentences
     sentences = [s.strip() for s in sentences if s.strip()]
 
     categorized_sentences = []
@@ -91,23 +80,18 @@ def categorize_sentences(text):
     for sent in sentences:
         sent_lower = sent.lower()
         matched_categories = []
-        #Loop through each category and it's keywords
         for category, keywords in categories.items():
-            #check if any keyword matches whole words in the sentence 
             if any(re.search(rf"\b{re.escape(kw)}\b", sent_lower) for kw in keywords):
                 matched_categories.append(category)
-        #Only save sentences that match at least one category (exclude uncategorized)
         if matched_categories:
             for cat in matched_categories:
                 categorized_sentences.append({"text": sent, "category": cat})
 
     return categorized_sentences
 
+# STREAMLIT APP
 
-#STREAMLIT APP
-
-#Set the tittle of the Streamlit
-st.title("📄 CV Parsing with Job Description Matching")
+st.title("📄 CV Parsing with Job Description Manual Matching")
 
 models = load_models()
 
@@ -138,7 +122,7 @@ text_for_classification = st.text_area(
 
 model_choice = st.selectbox("Choose a model:", list(models.keys()))
 
-if st.button("Predict and Match"):
+if st.button("Predict"):
     if not text_for_classification.strip():
         st.warning("Please enter or select some CV text for classification.")
     else:
@@ -148,22 +132,26 @@ if st.button("Predict and Match"):
 
         categorized = categorize_sentences(text_for_classification)
 
-        # Filter kalimat yang match dengan job desc & qual saja
-        if job_text_combined:
-            filtered = []
-            for item in categorized:
-                if check_match(item["text"], job_text_combined):
-                    filtered.append({**item, "match_with_job_desc": True})
-        else:
-            # Jika job desc kosong, tampilkan semua kategori tapi tanpa match
-            filtered = [{**item, "match_with_job_desc": False} for item in categorized]
-
-        df_categorized = pd.DataFrame(filtered)
+        # Buat dataframe dengan kolom manual_match yang bisa diedit checkbox-nya
+        df_categorized = pd.DataFrame(categorized)
         if df_categorized.empty:
-            st.info("No categorized sentences from CV match the Job Description and Qualifications.")
+            st.info("No categorized sentences from CV found.")
         else:
             df_categorized.index += 1
 
+            st.subheader("Manual Match Sentences with Job Description and Qualifications")
+            st.markdown("Centang kalimat yang menurut Anda relevan dengan Job Description dan Kualifikasi:")
+
+            # Buat list untuk checkbox manual match
+            manual_matches = []
+            for i, row in df_categorized.iterrows():
+                checked = st.checkbox(f"[{row['category']}] {row['text']}", key=f"match_{i}")
+                manual_matches.append(checked)
+
+            # Tambahkan kolom match hasil manual ke df
+            df_categorized["match_with_job_desc"] = manual_matches
+
+            # Tampilkan dataframe dengan highlight berdasarkan manual match
             def highlight_categories(row):
                 colors = {
                     "Education": "#FFDDC1",
@@ -174,30 +162,71 @@ if st.button("Predict and Match"):
                     "SoftSkill": "#C1C1FF",
                 }
                 base_color = colors.get(row["category"], "#FFFFFF")
-                # Highlight hijau muda jika match
                 if row["match_with_job_desc"]:
                     return [f"background-color: #B2FFB2;"] * len(row)
                 else:
                     return [f"background-color: {base_color};"] * len(row)
 
-            st.subheader("CV Categorization Matching Job Description")
-            st.dataframe(df_categorized.style.apply(highlight_categories, axis=1, subset=["category", "text", "match_with_job_desc"]))
+            st.subheader("CV Categorization with Manual Matching Result")
+            st.dataframe(df_categorized.style.apply(highlight_categories, axis=1))
 
-            # Summary kategori hanya kalimat yang match job desc & qual
-            df_cat = df_categorized["category"].value_counts()
+            # Summary kategori hanya yang dicentang manual match
+            df_matched = df_categorized[df_categorized["match_with_job_desc"] == True]
+            df_cat = df_matched["category"].value_counts()
 
-            st.markdown("### Summary of CV Categories Matching Job Description")
-            for i, (cat, count) in enumerate(df_cat.items(), start=1):
-                color = mcolors.TABLEAU_COLORS[list(mcolors.TABLEAU_COLORS.keys())[i % len(mcolors.TABLEAU_COLORS)]]
-                st.markdown(f"""
-                    <div style="background-color: {color}; border-radius: 10px; padding: 10px; margin-bottom: 10px; color: white;">
-                        <strong>{i}. {cat}</strong>: {count}
-                    </div>
-                """, unsafe_allow_html=True)
+            st.markdown("### Summary of CV Categories Matching Job Description (Manual)")
+            if not df_cat.empty:
+                for i, (cat, count) in enumerate(df_cat.items(), start=1):
+                    color = mcolors.TABLEAU_COLORS[list(mcolors.TABLEAU_COLORS.keys())[i % len(mcolors.TABLEAU_COLORS)]]
+                    st.markdown(f"""
+                        <div style="background-color: {color}; border-radius: 10px; padding: 10px; margin-bottom: 10px; color: white;">
+                            <strong>{i}. {cat}</strong>: {count}
+                        </div>
+                    """, unsafe_allow_html=True)
+            else:
+                st.info("No sentences manually matched with Job Description and Qualifications.")
 
-            st.subheader("Category Distribution (Pie Chart) for CV Text Matching Job Description")
-            fig, ax = plt.subplots()
-            colors = list(mcolors.TABLEAU_COLORS.values())[:len(df_cat)]
-            ax.pie(df_cat.values, labels=df_cat.index, colors=colors, autopct='%1.1f%%', startangle=90)
-            ax.axis('equal')
-            st.pyplot(fig)
+            st.subheader("Category Distribution (Pie Chart) for Manually Matched CV Text")
+            if not df_cat.empty:
+                fig, ax = plt.subplots()
+                colors = list(mcolors.TABLEAU_COLORS.values())[:len(df_cat)]
+                ax.pie(df_cat.values, labels=df_cat.index, colors=colors, autopct='%1.1f%%', startangle=90)
+                ax.axis('equal')
+                st.pyplot(fig)
+            else:
+                st.info("No data to display in pie chart.")
+
+            # Tampilkan Job Description dan Kualifikasi juga di bawah untuk referensi
+            st.subheader("Job Description and Qualifications Reference")
+            st.markdown("**Job Description:**")
+            st.write(job_desc)
+            st.markdown("**Job Qualifications:**")
+            st.write(job_qual)
+
+            # Download button untuk Excel export
+            def to_excel(df, job_desc, job_qual):
+                output = pd.ExcelWriter("CV_Parsed_Results.xlsx", engine='xlsxwriter')
+                df.to_excel(output, index=False, sheet_name='Categorized Sentences')
+
+                # Tambahkan sheet job description & qualification
+                workbook = output.book
+                ws = workbook.add_worksheet('Job Description & Qualification')
+                output.sheets['Job Description & Qualification'] = ws
+
+                ws.write(0, 0, "Job Description")
+                ws.write(1, 0, job_desc)
+                ws.write(3, 0, "Job Qualifications")
+                ws.write(4, 0, job_qual)
+
+                output.close()
+                with open("CV_Parsed_Results.xlsx", "rb") as f:
+                    data = f.read()
+                return data
+
+            excel_data = to_excel(df_categorized, job_desc, job_qual)
+            st.download_button(
+                label="Download Results as Excel",
+                data=excel_data,
+                file_name="CV_Parsed_Results.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
