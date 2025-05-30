@@ -166,8 +166,12 @@ if st.button("Predict and Match"):
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             )
 
-            st.subheader("Category Distribution (Pie Chart)")
+            st.markdown("### Summary of CV Categories")
             category_counts = df_categorized["category"].value_counts()
+            for i, (cat, count) in enumerate(category_counts.items(), start=1):
+                st.markdown(f"{i}. **{cat}**: {count}")
+
+            st.subheader("Category Distribution (Pie Chart)")
             fig, ax = plt.subplots()
             ax.pie(
                 category_counts.values,
@@ -177,7 +181,3 @@ if st.button("Predict and Match"):
             )
             ax.axis("equal")
             st.pyplot(fig)
-
-            st.markdown("### Summary of CV Categories")
-            for i, (cat, count) in enumerate(category_counts.items(), start=1):
-                st.markdown(f"{i}. **{cat}**: {count}")
