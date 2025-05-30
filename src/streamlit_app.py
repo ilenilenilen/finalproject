@@ -1,7 +1,6 @@
-# Import libraries
-import re
 import os
 import io
+import re
 import joblib
 import PyPDF2
 import streamlit as st
@@ -11,12 +10,11 @@ import matplotlib.colors as mcolors
 import nltk
 from nltk.tokenize.punkt import PunktSentenceTokenizer
 
-# Download 'punkt' tokenizer
-nltk.download('punkt', quiet=True)
-
-# Initialize the Punkt tokenizer explicitly
+# Download tokenizer
+nltk.download("punkt", quiet=True)
 tokenizer = PunktSentenceTokenizer()
 
+# Directory for model files
 MODEL_DIR = os.path.dirname(os.path.abspath(__file__))
 
 @st.cache_resource
@@ -24,11 +22,10 @@ def load_models():
     return {
         "Logistic Regression": joblib.load(os.path.join(MODEL_DIR, "lr_model.pkl")),
         "Naive Bayes": joblib.load(os.path.join(MODEL_DIR, "nb_model.pkl")),
-        "Ensemble": joblib.load(os.path.join(MODEL_DIR, "ensemble_model.pkl"), mmap_mode='r'),
+        "Ensemble": joblib.load(os.path.join(MODEL_DIR, "ensemble_model.pkl")),
         "SVM": joblib.load(os.path.join(MODEL_DIR, "svm_model.pkl")),
     }
 
-# Extract file from PDF
 def extract_text_from_pdf(file):
     try:
         pdf_reader = PyPDF2.PdfReader(file)
@@ -41,47 +38,22 @@ def extract_text_from_pdf(file):
     except Exception as e:
         return f"Error reading PDF: {e}"
 
-def check_match(sentence, job_text):
-    sent_lower = sentence.lower()
-    job_lower = job_text.lower()
-    return any(word in job_lower for word in sent_lower.split())
-
 def categorize_sentences(text):
-    categories = {
-        "Education": ["education", "degree", "university", "bachelor", "master", "phd", "gpa"],
-        "Experience": ["experience", "job", "worked", "years", "intern"],
-        "Requirement": ["requirement", "qualification", "criteria", "must"],
-        "Responsibility": ["responsibility", "task", "duty", "role"],
-        "Skill": ["skill", "tools", "excel", "project management"],
-        "SoftSkill": ["communication", "leadership", "teamwork", "problem-solving"]
-    }
-
     sentences = tokenizer.tokenize(text)
-    sentences = [s.strip() for s in sentences if s.strip()]
+    return [s.strip() for s in sentences if s.strip()]
 
-    categorized_sentences = []
+def to_excel(df):
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
+        df.to_excel(writer, index=False, sheet_name="Manual Matching")
+    return output.getvalue()
 
-    for sent in sentences:
-        sent_lower = sent.lower()
-        matched_categories = []
-        for category, keywords in categories.items():
-            if any(re.search(rf"\b{re.escape(kw)}\b", sent_lower) for kw in keywords):
-                matched_categories.append(category)
-        if matched_categories:
-            for cat in matched_categories:
-                categorized_sentences.append({"text": sent, "category": cat})
-
-    return categorized_sentences
-
-# STREAMLIT APP
-st.title("📄 CV Parsing with Job Description Matching")
-
+# Streamlit App
+st.title("📄 CV Parsing and Job Description Matching")
 models = load_models()
 
 uploaded_file = st.file_uploader("Upload your CV (PDF format only):", type=["pdf"])
-
 cv_text = ""
-
 if uploaded_file is not None:
     with uploaded_file:
         cv_text = extract_text_from_pdf(uploaded_file)
@@ -90,62 +62,63 @@ if uploaded_file is not None:
     else:
         st.error("No text could be extracted from the uploaded file.")
 
-st.subheader("Job Description Input (from HR)")
+st.subheader("Job Description Input")
 job_desc = st.text_area("Enter Job Description:", height=150)
-job_qual = st.text_area("Enter Job Qualifications:", height=150)
 
-job_text_combined = (job_desc + " " + job_qual).strip()
+st.subheader("Text Input for Classification")
+text_for_classification = st.text_area(
+    "Enter CV text manually or use extracted CV text above:",
+    value=cv_text if cv_text.strip() else "",
+    height=200,
+)
 
-if st.button("Process CV"):
-    categorized = categorize_sentences(cv_text)
+model_choice = st.selectbox("Choose a model:", list(models.keys()))
 
-    # DataFrame creation
-    df_categorized = pd.DataFrame(categorized)
+if st.button("Predict and Match"):
+    if not text_for_classification.strip():
+        st.warning("Please enter or select some CV text for classification.")
+    else:
+        model = models[model_choice]
+        sentences = categorize_sentences(text_for_classification)
 
-    if not df_categorized.empty:
-        df_categorized.index += 1
+        # Predict categories for each sentence
+        predictions = [model.predict([sentence])[0] for sentence in sentences]
+        df_results = pd.DataFrame({"Sentence": sentences, "Prediction": predictions})
 
-        # Initialize checkbox states
-        if 'checked_rows' not in st.session_state:
-            st.session_state.checked_rows = [False] * len(df_categorized)
+        # Add manual matching column
+        if "manual_match" not in st.session_state:
+            st.session_state.manual_match = [False] * len(df_results)
 
-        # Add a "manual_match" column with checkboxes
-        df_categorized['manual_match'] = [
-            st.checkbox(f"Row {i+1}", value=st.session_state.checked_rows[i], key=f"row_{i}")
-            for i in range(len(df_categorized))
+        df_results["Manual Match"] = [
+            st.checkbox(f"{df_results.loc[i, 'Sentence'][:50]}...", value=st.session_state.manual_match[i], key=f"manual_match_{i}")
+            for i in range(len(df_results))
         ]
 
-        # Summary kategori
-        df_cat = df_categorized["category"].value_counts()
-        st.subheader("Summary of Categorized Sentences")
+        st.subheader("Categorized Sentences with Predictions")
+        st.dataframe(df_results)
+
+        # Summary
+        df_cat = df_results["Prediction"].value_counts()
+        st.markdown("### Summary of Predictions")
         for i, (cat, count) in enumerate(df_cat.items(), start=1):
             color = mcolors.TABLEAU_COLORS[list(mcolors.TABLEAU_COLORS.keys())[i % len(mcolors.TABLEAU_COLORS)]]
-            st.markdown(f"""
-                <div style="background-color: {color}; border-radius: 10px; padding: 10px; margin-bottom: 10px; color: white;">
-                    <strong>{i}. {cat}</strong>: {count}
-                </div>
-            """, unsafe_allow_html=True)
+            st.markdown(
+                f"<div style='background-color: {color}; padding: 10px; margin: 5px; color: white; border-radius: 5px;'>"
+                f"<strong>{i}. {cat}</strong>: {count}</div>",
+                unsafe_allow_html=True,
+            )
 
-        # Pie chart
-        st.subheader("Category Distribution (Pie Chart)")
+        st.subheader("Prediction Distribution (Pie Chart)")
         fig, ax = plt.subplots()
         colors = list(mcolors.TABLEAU_COLORS.values())[:len(df_cat)]
-        ax.pie(df_cat.values, labels=df_cat.index, colors=colors, autopct='%1.1f%%', startangle=90)
-        ax.axis('equal')
+        ax.pie(df_cat.values, labels=df_cat.index, colors=colors, autopct="%1.1f%%", startangle=90)
+        ax.axis("equal")
         st.pyplot(fig)
 
-        def to_excel(df):
-            output = io.BytesIO()
-            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                df.to_excel(writer, index=False, sheet_name='Categorized Sentences')
-            return output.getvalue()
-
+        # Download Data
         st.download_button(
-            label="📥 Download Categorized Sentences",
-            data=to_excel(df_categorized),
-            file_name="categorized_sentences.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            label="📥 Download DataFrame with Predictions and Manual Match",
+            data=to_excel(df_results),
+            file_name="predictions_manual_match.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
-
-        st.write("### 📄 Categorized Sentences with Manual Matching")
-        st.dataframe(df_categorized)
