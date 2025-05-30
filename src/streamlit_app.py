@@ -25,8 +25,6 @@ def load_models():
     return {
         "Logistic Regression": joblib.load(os.path.join(MODEL_DIR, "lr_model.pkl")),
         "Naive Bayes": joblib.load(os.path.join(MODEL_DIR, "nb_model.pkl")),
-        #"SVM": joblib.load(os.path.join(MODEL_DIR, "svm_model.pkl")),
-        #"Ensemble": joblib.load(os.path.join(MODEL_DIR, "ensemble_model.pkl")),
     }
 
 #Extract text from PDF
