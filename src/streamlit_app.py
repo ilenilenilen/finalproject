@@ -48,7 +48,8 @@ def to_excel(df):
     return output.getvalue()
 
 # --- Streamlit App ---
-st.title("📄 CV Parsing and Job Description Matching (with AgGrid)")
+st.title("📄 CV Parsing and Job Description Matching (AgGrid Fix)")
+
 models = load_models()
 
 # --- File Upload ---
@@ -62,11 +63,9 @@ if uploaded_file is not None:
     else:
         st.error("No text could be extracted from the uploaded file.")
 
-# --- Job Description Input ---
 st.subheader("Job Description Input")
 job_desc = st.text_area("Enter Job Description:", height=150)
 
-# --- Text for Classification ---
 st.subheader("Text Input for Classification")
 text_for_classification = st.text_area(
     "Enter CV text manually or use extracted CV text above:",
@@ -77,10 +76,9 @@ text_for_classification = st.text_area(
 model_choice = st.selectbox("Choose a model:", list(models.keys()))
 
 # --- Initialize Session State ---
-if "aggrid_data" not in st.session_state:
-    st.session_state.aggrid_data = None
+if "df_results" not in st.session_state:
+    st.session_state.df_results = None
 
-# --- Predict Button ---
 if st.button("Predict and Match"):
     if not text_for_classification.strip():
         st.warning("Please enter or select some CV text for classification.")
@@ -95,35 +93,33 @@ if st.button("Predict and Match"):
             "Manual Match": [False] * len(sentences)
         })
 
-        # --- AgGrid Setup ---
-        st.subheader("Categorized Sentences with Predictions (Editable)")
-        gb = GridOptionsBuilder.from_dataframe(df_results)
-        gb.configure_column("Manual Match", editable=True, cellEditor='agCheckboxCellEditor')
-        gb.configure_column("Sentence", wrapText=True, autoHeight=True)
-        gb.configure_grid_options(domLayout='normal')
-        grid_options = gb.build()
+        st.session_state.df_results = df_results
 
-        grid_response = AgGrid(
-            df_results,
-            gridOptions=grid_options,
-            enable_enterprise_modules=False,
-            fit_columns_on_grid_load=True,
-            update_mode=GridUpdateMode.VALUE_CHANGED,
-            allow_unsafe_jscode=True,
-            height=400,
-        )
+# --- AgGrid and Output Display ---
+if st.session_state.df_results is not None:
+    st.subheader("Categorized Sentences with Predictions (Editable)")
+    gb = GridOptionsBuilder.from_dataframe(st.session_state.df_results)
+    gb.configure_column("Manual Match", editable=True, cellEditor='agCheckboxCellEditor')
+    gb.configure_column("Sentence", wrapText=True, autoHeight=True)
+    gb.configure_grid_options(domLayout='normal')
+    grid_options = gb.build()
 
-        # --- Save edited grid state ---
-        if grid_response['data'] is not None:
-            st.session_state.aggrid_data = pd.DataFrame(grid_response['data'])
+    grid_response = AgGrid(
+        st.session_state.df_results,
+        gridOptions=grid_options,
+        enable_enterprise_modules=False,
+        fit_columns_on_grid_load=True,
+        update_mode=GridUpdateMode.VALUE_CHANGED,
+        allow_unsafe_jscode=True,
+        height=400,
+    )
 
-# --- If AgGrid Data Exists, Show Summary ---
-if st.session_state.aggrid_data is not None:
-    df_results = st.session_state.aggrid_data
+    if grid_response['data'] is not None:
+        st.session_state.df_results = pd.DataFrame(grid_response['data'])
 
     # --- Summary ---
+    df_cat = st.session_state.df_results["Prediction"].value_counts()
     st.subheader("Summary of Predictions")
-    df_cat = df_results["Prediction"].value_counts()
     for i, (cat, count) in enumerate(df_cat.items(), start=1):
         color = mcolors.TABLEAU_COLORS[list(mcolors.TABLEAU_COLORS.keys())[i % len(mcolors.TABLEAU_COLORS)]]
         st.markdown(
@@ -143,7 +139,7 @@ if st.session_state.aggrid_data is not None:
     # --- Excel Download ---
     st.download_button(
         label="📥 Download Predictions + Manual Match (Excel)",
-        data=to_excel(df_results),
+        data=to_excel(st.session_state.df_results),
         file_name="cv_match_aggrid.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
