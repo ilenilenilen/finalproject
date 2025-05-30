@@ -99,7 +99,7 @@ def convert_df_to_excel(df):
     return processed_data
 
 # STREAMLIT APP
-st.title("\ud83d\udcc4 CV Parsing with Manual Matching")
+st.title("CV Parsing with Manual Matching")
 
 models = load_models()
 
