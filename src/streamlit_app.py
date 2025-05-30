@@ -89,7 +89,7 @@ def categorize_sentences(text):
                 matched_categories.append(category)
         if matched_categories:
             for cat in matched_categories:
-                categorized_sentences.append({"text": sent, "category": cat})
+                categorized_sentences.append({"text": sent, "category": cat, "match_with_job_desc": False})
 
     return categorized_sentences
 
@@ -132,33 +132,26 @@ text_for_classification = st.text_area(
     height=200,
 )
 
-model_choice = st.selectbox("Choose a model:", list(models.keys()))
-
 if st.button("Predict and Match"):
     if not text_for_classification.strip():
         st.warning("Please enter or select some CV text for classification.")
     else:
-        model = models[model_choice]
-        prediction = model.predict([text_for_classification])[0]
-        st.success(f"Prediction: {prediction}")
-
         categorized = categorize_sentences(text_for_classification)
         df_categorized = pd.DataFrame(categorized)
         if df_categorized.empty:
             st.info("No categorized sentences found in the CV text.")
         else:
-            df_categorized.index += 1
-            df_categorized["match_with_job_desc"] = False  # Default as False
+            st.subheader("Categorized CV Sentences with Manual Matching")
+            df_categorized["match_with_job_desc"] = False
 
-            st.subheader("CV Categorization")
-            for i, row in df_categorized.iterrows():
-                col1, col2 = st.columns([3, 1])
-                with col1:
-                    st.write(f"{i}. {row['category']}: {row['text']}")
-                with col2:
-                    if st.checkbox("Match", key=f"match_{i}"):
-                        df_categorized.at[i - 1, "match_with_job_desc"] = True
+            for i in range(len(df_categorized)):
+                checkbox = st.checkbox(
+                    f"{df_categorized.iloc[i]['text']} ({df_categorized.iloc[i]['category']})",
+                    key=f"match_{i}"
+                )
+                df_categorized.at[i, "match_with_job_desc"] = checkbox
 
+            # Downloadable DataFrame
             st.download_button(
                 label="Download Categorized Data as Excel",
                 data=convert_df_to_excel(df_categorized),
@@ -166,11 +159,13 @@ if st.button("Predict and Match"):
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             )
 
-            st.markdown("### Summary of CV Categories")
+            # Display summary
+            st.subheader("Summary of CV Categories")
             category_counts = df_categorized["category"].value_counts()
             for i, (cat, count) in enumerate(category_counts.items(), start=1):
                 st.markdown(f"{i}. **{cat}**: {count}")
 
+            # Display pie chart
             st.subheader("Category Distribution (Pie Chart)")
             fig, ax = plt.subplots()
             ax.pie(
