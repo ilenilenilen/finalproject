@@ -99,33 +99,21 @@ job_text_combined = (job_desc + " " + job_qual).strip()
 if st.button("Process CV"):
     categorized = categorize_sentences(cv_text)
 
-    if job_text_combined:
-        filtered = [
-            {**item, "match_with_job_desc": check_match(item["text"], job_text_combined)}
-            for item in categorized
-        ]
-    else:
-        filtered = [{**item, "match_with_job_desc": False} for item in categorized]
+    # DataFrame creation
+    df_categorized = pd.DataFrame(categorized)
 
-    df_categorized = pd.DataFrame(filtered)
-    if df_categorized.empty:
-        st.info("No categorized sentences found.")
-    else:
+    if not df_categorized.empty:
         df_categorized.index += 1
 
         # Initialize checkbox states
         if 'checked_rows' not in st.session_state:
             st.session_state.checked_rows = [False] * len(df_categorized)
 
-        st.write("### ✅ Select Sentences Matching Job Description")
-        for i in range(len(df_categorized)):
-            st.session_state.checked_rows[i] = st.checkbox(
-                f"[{df_categorized.iloc[i]['category']}] {df_categorized.iloc[i]['text']}",
-                value=st.session_state.checked_rows[i],
-                key=f"row_{i}"
-            )
-
-        df_categorized['manual_match'] = st.session_state.checked_rows
+        # Add a "manual_match" column with checkboxes
+        df_categorized['manual_match'] = [
+            st.checkbox(f"Row {i+1}", value=st.session_state.checked_rows[i], key=f"row_{i}")
+            for i in range(len(df_categorized))
+        ]
 
         # Summary kategori
         df_cat = df_categorized["category"].value_counts()
