@@ -151,11 +151,12 @@ if st.button("Predict and Categorize"):
                 ax.axis('equal')
                 st.pyplot(fig)
 
-            # Download Excel
+            # ✅ FIXED: Save Excel without calling `.save()`
             output = io.BytesIO()
             with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
                 edited_df.to_excel(writer, index=True, sheet_name="CV_Match")
-                writer.save()
+            output.seek(0)  # Move cursor to start of the stream
+
             st.download_button(
                 label="📥 Download Matched CV Data as Excel",
                 data=output.getvalue(),
