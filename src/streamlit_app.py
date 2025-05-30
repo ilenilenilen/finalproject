@@ -1,3 +1,4 @@
+# Import libraries
 import re
 import os
 import joblib
@@ -8,7 +9,6 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import nltk
 from nltk.tokenize.punkt import PunktSentenceTokenizer
-import io
 
 # Download 'punkt' tokenizer
 nltk.download('punkt', quiet=True)
@@ -40,44 +40,20 @@ def extract_text_from_pdf(file):
     except Exception as e:
         return f"Error reading PDF: {e}"
 
-# Categorize sentences based on predefined categories
 def categorize_sentences(text):
     categories = {
-        "Education": [
-            "education", "degree", "university", "bachelor", "master", "phd", "gpa",
-            "computer science", "mathematics", "statistics", "information system", "relevant major"
-        ],
-        "Experience": [
-            "experience", "worked", "job", "position", "years", "intern",
-            "5 years", "data science", "data scientist", "fintech", "finance services",
-            "production environment"
-        ],
-        "Requirement": [
-            "requirement", "mandatory", "qualification", "criteria", "must", "eligibility",
-            "deep understanding", "strong analytical thinking", "proven experience", "advantage"
-        ],
-        "Responsibility": [
-            "responsibility", "task", "duty", "role", "accountable", "responsible",
-            "design", "build", "deploy", "perform testing", "model implementation",
-            "fine tuning", "drive improvement"
-        ],
-        "Skill": [
-            "skill", "expertise", "proficiency", "tools", "excel",
-            "project management", "research", "problem solving", "public speaking",
-            "machine learning", "model development", "model deployment", "risk evaluation",
-            "business impact analysis", "feature engineering", "algorithm", "analysis"
-        ],
-        "SoftSkill": [
-            "communication", "leadership", "teamwork", "problem-solving", "advocacy",
-            "relationship building", "analytical thinking"
-        ],
+        "Education": ["education", "degree", "university", "bachelor", "master", "phd", "gpa", "computer science", "mathematics"],
+        "Experience": ["experience", "worked", "job", "position", "years", "intern", "data science", "data scientist", "production environment"],
+        "Requirement": ["requirement", "mandatory", "qualification", "criteria", "eligibility", "proven experience", "advantage"],
+        "Responsibility": ["responsibility", "task", "duty", "role", "design", "build", "deploy", "testing", "model implementation"],
+        "Skill": ["skill", "expertise", "tools", "excel", "problem solving", "machine learning", "model deployment", "algorithm"],
+        "SoftSkill": ["communication", "leadership", "teamwork", "problem-solving", "analytical thinking"]
     }
 
     sentences = tokenizer.tokenize(text)
     sentences = [s.strip() for s in sentences if s.strip()]
 
     categorized_sentences = []
-
     for sent in sentences:
         sent_lower = sent.lower()
         matched_categories = []
@@ -86,27 +62,18 @@ def categorize_sentences(text):
                 matched_categories.append(category)
         if matched_categories:
             for cat in matched_categories:
-                categorized_sentences.append({"text": sent, "category": cat, "match_with_job_desc": False})
+                categorized_sentences.append({"text": sent, "category": cat})
 
     return categorized_sentences
 
-# Convert DataFrame to Excel
-def convert_df_to_excel(df):
-    output = io.BytesIO()
-    with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
-        df.to_excel(writer, index=False, sheet_name="Categorized Data")
-    processed_data = output.getvalue()
-    return processed_data
-
 # STREAMLIT APP
-st.title("CV Parsing with Manual Matching")
+st.title("📄 CV Parsing with Manual Match Selection")
 
 models = load_models()
 
 uploaded_file = st.file_uploader("Upload your CV (PDF format only):", type=["pdf"])
 
 cv_text = ""
-
 if uploaded_file is not None:
     with uploaded_file:
         cv_text = extract_text_from_pdf(uploaded_file)
@@ -115,52 +82,36 @@ if uploaded_file is not None:
     else:
         st.error("No text could be extracted from the uploaded file.")
 
-st.subheader("Text Input for Classification")
-text_for_classification = st.text_area(
-    "Enter CV text manually or use extracted CV text above:",
-    value=cv_text if cv_text.strip() else "",
-    height=200,
-)
-
-if st.button("Categorize and Match"):
-    if not text_for_classification.strip():
-        st.warning("Please enter or select some CV text for classification.")
+if st.button("Categorize and Analyze"):
+    if not cv_text.strip():
+        st.warning("Please upload a CV to analyze.")
     else:
-        categorized = categorize_sentences(text_for_classification)
+        categorized = categorize_sentences(cv_text)
         df_categorized = pd.DataFrame(categorized)
 
         if df_categorized.empty:
-            st.info("No categorized sentences found in the CV text.")
+            st.info("No categorized sentences found in the uploaded CV.")
         else:
-            st.subheader("Categorized CV Sentences with Manual Matching")
-            for i in range(len(df_categorized)):
-                checkbox = st.checkbox(
-                    f"{df_categorized.iloc[i]['text']} ({df_categorized.iloc[i]['category']})",
-                    key=f"match_{i}"
-                )
-                df_categorized.at[i, "match_with_job_desc"] = checkbox
+            df_categorized["match"] = False  # Default value for the match column
+
+            st.subheader("CV Categorization with Manual Match Selection")
+            edited_df = st.experimental_data_editor(df_categorized, use_container_width=True)
 
             st.download_button(
-                label="Download Categorized Data as Excel",
-                data=convert_df_to_excel(df_categorized),
-                file_name="categorized_cv_data.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                "Download Categorized CV as Excel",
+                data=edited_df.to_csv(index=False),
+                file_name="categorized_cv.xlsx",
+                mime="text/csv",
             )
 
-            # Summary
+            # Summary and Pie Chart for CV Text
             st.subheader("Summary of CV Categories")
-            category_counts = df_categorized["category"].value_counts()
-            for i, (cat, count) in enumerate(category_counts.items(), start=1):
-                st.markdown(f"{i}. **{cat}**: {count}")
+            df_cat = edited_df["category"].value_counts()
+            st.bar_chart(df_cat)
 
-            # Pie Chart
             st.subheader("Category Distribution (Pie Chart)")
             fig, ax = plt.subplots()
-            ax.pie(
-                category_counts.values,
-                labels=category_counts.index,
-                autopct="%1.1f%%",
-                startangle=90,
-            )
-            ax.axis("equal")
+            colors = list(mcolors.TABLEAU_COLORS.values())[:len(df_cat)]
+            ax.pie(df_cat.values, labels=df_cat.index, colors=colors, autopct='%1.1f%%', startangle=90)
+            ax.axis('equal')
             st.pyplot(fig)
