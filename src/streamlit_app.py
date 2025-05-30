@@ -6,19 +6,17 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
+import nltk
 from nltk.tokenize.punkt import PunktSentenceTokenizer
 import io
 
 # Download 'punkt' tokenizer
-import nltk
 nltk.download('punkt', quiet=True)
 
 # Initialize the Punkt tokenizer explicitly
 tokenizer = PunktSentenceTokenizer()
 
-# Constants
 MODEL_DIR = os.path.dirname(os.path.abspath(__file__))
-
 
 @st.cache_resource
 def load_models():
@@ -29,8 +27,7 @@ def load_models():
         "SVM": joblib.load(os.path.join(MODEL_DIR, "svm_model.pkl")),
     }
 
-
-# Extract text from PDF
+# Extract file from PDF
 def extract_text_from_pdf(file):
     try:
         pdf_reader = PyPDF2.PdfReader(file)
@@ -43,7 +40,7 @@ def extract_text_from_pdf(file):
     except Exception as e:
         return f"Error reading PDF: {e}"
 
-
+# Categorize sentences based on predefined categories
 def categorize_sentences(text):
     categories = {
         "Education": [
@@ -93,22 +90,21 @@ def categorize_sentences(text):
 
     return categorized_sentences
 
-
 # Convert DataFrame to Excel
 def convert_df_to_excel(df):
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
-        df.to_excel(writer, index=False, sheet_name="Matched Data")
+        df.to_excel(writer, index=False, sheet_name="Categorized Data")
     processed_data = output.getvalue()
     return processed_data
 
-
-# Streamlit Application
-st.title("📄 CV Parsing with Job Description Matching")
+# STREAMLIT APP
+st.title("\ud83d\udcc4 CV Parsing with Manual Matching")
 
 models = load_models()
 
 uploaded_file = st.file_uploader("Upload your CV (PDF format only):", type=["pdf"])
+
 cv_text = ""
 
 if uploaded_file is not None:
@@ -119,12 +115,6 @@ if uploaded_file is not None:
     else:
         st.error("No text could be extracted from the uploaded file.")
 
-st.subheader("Job Description Input (from HR)")
-job_desc = st.text_area("Enter Job Description (responsibilities, tasks, etc.):", height=150)
-job_qual = st.text_area("Enter Job Qualifications:", height=150)
-
-job_text_combined = (job_desc + " " + job_qual).strip()
-
 st.subheader("Text Input for Classification")
 text_for_classification = st.text_area(
     "Enter CV text manually or use extracted CV text above:",
@@ -132,18 +122,17 @@ text_for_classification = st.text_area(
     height=200,
 )
 
-if st.button("Predict and Match"):
+if st.button("Categorize and Match"):
     if not text_for_classification.strip():
         st.warning("Please enter or select some CV text for classification.")
     else:
         categorized = categorize_sentences(text_for_classification)
         df_categorized = pd.DataFrame(categorized)
+
         if df_categorized.empty:
             st.info("No categorized sentences found in the CV text.")
         else:
             st.subheader("Categorized CV Sentences with Manual Matching")
-            df_categorized["match_with_job_desc"] = False
-
             for i in range(len(df_categorized)):
                 checkbox = st.checkbox(
                     f"{df_categorized.iloc[i]['text']} ({df_categorized.iloc[i]['category']})",
@@ -151,7 +140,6 @@ if st.button("Predict and Match"):
                 )
                 df_categorized.at[i, "match_with_job_desc"] = checkbox
 
-            # Downloadable DataFrame
             st.download_button(
                 label="Download Categorized Data as Excel",
                 data=convert_df_to_excel(df_categorized),
@@ -159,13 +147,13 @@ if st.button("Predict and Match"):
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             )
 
-            # Display summary
+            # Summary
             st.subheader("Summary of CV Categories")
             category_counts = df_categorized["category"].value_counts()
             for i, (cat, count) in enumerate(category_counts.items(), start=1):
                 st.markdown(f"{i}. **{cat}**: {count}")
 
-            # Display pie chart
+            # Pie Chart
             st.subheader("Category Distribution (Pie Chart)")
             fig, ax = plt.subplots()
             ax.pie(
