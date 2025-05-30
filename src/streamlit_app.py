@@ -1,3 +1,4 @@
+# --- Tambahan Library ---
 import os
 import io
 import re
@@ -9,6 +10,7 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import nltk
 from nltk.tokenize.punkt import PunktSentenceTokenizer
+from st_aggrid import AgGrid, GridOptionsBuilder
 
 # Download tokenizer
 nltk.download("punkt", quiet=True)
@@ -22,8 +24,8 @@ def load_models():
     return {
         "Logistic Regression": joblib.load(os.path.join(MODEL_DIR, "lr_model.pkl")),
         "Naive Bayes": joblib.load(os.path.join(MODEL_DIR, "nb_model.pkl")),
-        #"Ensemble": joblib.load(os.path.join(MODEL_DIR, "ensemble_model.pkl")),
-        #"SVM": joblib.load(os.path.join(MODEL_DIR, "svm_model.pkl")),
+        # "Ensemble": joblib.load(os.path.join(MODEL_DIR, "ensemble_model.pkl")),
+        # "SVM": joblib.load(os.path.join(MODEL_DIR, "svm_model.pkl")),
     }
 
 def extract_text_from_pdf(file):
@@ -48,8 +50,8 @@ def to_excel(df):
         df.to_excel(writer, index=False, sheet_name="Manual Matching")
     return output.getvalue()
 
-# Streamlit App
-st.title("📄 CV Parsing and Job Description Matching")
+# -------------------- STREAMLIT APP --------------------
+st.title("📄 CV Parsing and Job Description Matching (with AgGrid)")
 models = load_models()
 
 uploaded_file = st.file_uploader("Upload your CV (PDF format only):", type=["pdf"])
@@ -81,25 +83,35 @@ if st.button("Predict and Match"):
         model = models[model_choice]
         sentences = categorize_sentences(text_for_classification)
 
-        # Predict categories for each sentence
         predictions = [model.predict([sentence])[0] for sentence in sentences]
-        df_results = pd.DataFrame({"Sentence": sentences, "Prediction": predictions})
+        df_results = pd.DataFrame({
+            "Sentence": sentences,
+            "Prediction": predictions,
+            "Manual Match": [False] * len(sentences)
+        })
 
-        # Add manual matching column
-        if "manual_match" not in st.session_state:
-            st.session_state.manual_match = [False] * len(df_results)
+        st.subheader("Categorized Sentences with Predictions (Editable)")
+        gb = GridOptionsBuilder.from_dataframe(df_results)
+        gb.configure_column("Manual Match", editable=True, cellEditor='agCheckboxCellEditor')
+        gb.configure_column("Sentence", wrapText=True, autoHeight=True)
+        gb.configure_grid_options(domLayout='normal')
 
-        df_results["Manual Match"] = [
-            st.checkbox(f"{df_results.loc[i, 'Sentence'][:50]}...", value=st.session_state.manual_match[i], key=f"manual_match_{i}")
-            for i in range(len(df_results))
-        ]
+        grid_options = gb.build()
+        grid_response = AgGrid(
+            df_results,
+            gridOptions=grid_options,
+            enable_enterprise_modules=False,
+            fit_columns_on_grid_load=True,
+            update_mode='VALUE_CHANGED',
+            allow_unsafe_jscode=True,
+            height=400,
+        )
 
-        st.subheader("Categorized Sentences with Predictions")
-        st.dataframe(df_results)
+        edited_df = grid_response['data']
+        df_results = pd.DataFrame(edited_df)
 
-        # Summary
+        st.subheader("Summary of Predictions")
         df_cat = df_results["Prediction"].value_counts()
-        st.markdown("### Summary of Predictions")
         for i, (cat, count) in enumerate(df_cat.items(), start=1):
             color = mcolors.TABLEAU_COLORS[list(mcolors.TABLEAU_COLORS.keys())[i % len(mcolors.TABLEAU_COLORS)]]
             st.markdown(
@@ -115,10 +127,10 @@ if st.button("Predict and Match"):
         ax.axis("equal")
         st.pyplot(fig)
 
-        # Download Data
+        # Download Excel
         st.download_button(
-            label="📥 Download DataFrame with Predictions and Manual Match",
+            label="📥 Download Predictions + Manual Match (Excel)",
             data=to_excel(df_results),
-            file_name="predictions_manual_match.xlsx",
+            file_name="cv_match_aggrid.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
