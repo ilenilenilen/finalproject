@@ -1,4 +1,3 @@
-# Import libraries
 import re
 import os
 import joblib
@@ -7,16 +6,19 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
-import nltk
 from nltk.tokenize.punkt import PunktSentenceTokenizer
+import io
 
 # Download 'punkt' tokenizer
+import nltk
 nltk.download('punkt', quiet=True)
 
 # Initialize the Punkt tokenizer explicitly
 tokenizer = PunktSentenceTokenizer()
 
+# Constants
 MODEL_DIR = os.path.dirname(os.path.abspath(__file__))
+
 
 @st.cache_resource
 def load_models():
@@ -27,6 +29,8 @@ def load_models():
         "SVM": joblib.load(os.path.join(MODEL_DIR, "svm_model.pkl")),
     }
 
+
+# Extract text from PDF
 def extract_text_from_pdf(file):
     try:
         pdf_reader = PyPDF2.PdfReader(file)
@@ -39,11 +43,6 @@ def extract_text_from_pdf(file):
     except Exception as e:
         return f"Error reading PDF: {e}"
 
-def check_match(sentence, job_text):
-    """Check if the sentence matches the job text."""
-    sent_lower = sentence.lower()
-    job_lower = job_text.lower()
-    return any(word in job_lower for word in sent_lower.split())
 
 def categorize_sentences(text):
     categories = {
@@ -53,27 +52,27 @@ def categorize_sentences(text):
         ],
         "Experience": [
             "experience", "worked", "job", "position", "years", "intern",
-            "data collection", "data cleaning", "data organization", "data analysis", "dashboard development",
-            "report creation", "business intelligence", "collaboration", "teamwork"
+            "5 years", "data science", "data scientist", "fintech", "finance services",
+            "production environment"
         ],
         "Requirement": [
             "requirement", "mandatory", "qualification", "criteria", "must", "eligibility",
-            "proficiency", "data analysis tools", "advanced statistics", "problem solving",
-            "business acumen", "detail-oriented", "best practices"
+            "deep understanding", "strong analytical thinking", "proven experience", "advantage"
         ],
         "Responsibility": [
             "responsibility", "task", "duty", "role", "accountable", "responsible",
-            "collecting data", "cleaning data", "organizing data", "performing advanced analysis",
-            "developing dashboards", "reporting insights", "collaborating with teams", "improving processes"
+            "design", "build", "deploy", "perform testing", "model implementation",
+            "fine tuning", "drive improvement"
         ],
         "Skill": [
-            "skill", "expertise", "proficiency", "tools", "excel", "data visualization",
-            "power bi", "tableau", "sql", "python", "r programming", "machine learning basics",
-            "statistical modeling", "data storytelling", "presentation skills"
+            "skill", "expertise", "proficiency", "tools", "excel",
+            "project management", "research", "problem solving", "public speaking",
+            "machine learning", "model development", "model deployment", "risk evaluation",
+            "business impact analysis", "feature engineering", "algorithm", "analysis"
         ],
         "SoftSkill": [
-            "communication", "leadership", "teamwork", "problem-solving", "collaboration",
-            "analytical thinking", "time management", "critical thinking", "adaptability"
+            "communication", "leadership", "teamwork", "problem-solving", "advocacy",
+            "relationship building", "analytical thinking"
         ],
     }
 
@@ -94,14 +93,22 @@ def categorize_sentences(text):
 
     return categorized_sentences
 
-# --- STREAMLIT APP ---
 
+# Convert DataFrame to Excel
+def convert_df_to_excel(df):
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
+        df.to_excel(writer, index=False, sheet_name="Matched Data")
+    processed_data = output.getvalue()
+    return processed_data
+
+
+# Streamlit Application
 st.title("📄 CV Parsing with Job Description Matching")
 
 models = load_models()
 
 uploaded_file = st.file_uploader("Upload your CV (PDF format only):", type=["pdf"])
-
 cv_text = ""
 
 if uploaded_file is not None:
@@ -136,55 +143,41 @@ if st.button("Predict and Match"):
         st.success(f"Prediction: {prediction}")
 
         categorized = categorize_sentences(text_for_classification)
-
-        # Filter sentences that match the job description
-        if job_text_combined:
-            filtered = []
-            for item in categorized:
-                if check_match(item["text"], job_text_combined):
-                    filtered.append({**item, "match_with_job_desc": True})
-        else:
-            filtered = [{**item, "match_with_job_desc": False} for item in categorized]
-
-        df_categorized = pd.DataFrame(filtered)
+        df_categorized = pd.DataFrame(categorized)
         if df_categorized.empty:
-            st.info("No categorized sentences from CV match the Job Description and Qualifications.")
+            st.info("No categorized sentences found in the CV text.")
         else:
             df_categorized.index += 1
+            df_categorized["match_with_job_desc"] = False  # Default as False
 
-            def highlight_categories(row):
-                colors = {
-                    "Education": "#FFDDC1",
-                    "Experience": "#FFC1C1",
-                    "Requirement": "#C1E1FF",
-                    "Responsibility": "#FFDAC1",
-                    "Skill": "#C1FFC1",
-                    "SoftSkill": "#C1C1FF",
-                }
-                base_color = colors.get(row["category"], "#FFFFFF")
-                if row["match_with_job_desc"]:
-                    return [f"background-color: #B2FFB2;"] * len(row)
-                else:
-                    return [f"background-color: {base_color};"] * len(row)
+            st.subheader("CV Categorization")
+            for i, row in df_categorized.iterrows():
+                col1, col2 = st.columns([3, 1])
+                with col1:
+                    st.write(f"{i}. {row['category']}: {row['text']}")
+                with col2:
+                    if st.checkbox("Match", key=f"match_{i}"):
+                        df_categorized.at[i - 1, "match_with_job_desc"] = True
 
-            st.subheader("CV Categorization Matching Job Description")
-            st.dataframe(df_categorized.style.apply(highlight_categories, axis=1, subset=["category", "text", "match_with_job_desc"]))
+            st.download_button(
+                label="Download Categorized Data as Excel",
+                data=convert_df_to_excel(df_categorized),
+                file_name="categorized_cv_data.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
 
-            # Summary of categories
-            df_cat = df_categorized["category"].value_counts()
-
-            st.markdown("### Summary of CV Categories Matching Job Description")
-            for i, (cat, count) in enumerate(df_cat.items(), start=1):
-                color = mcolors.TABLEAU_COLORS[list(mcolors.TABLEAU_COLORS.keys())[i % len(mcolors.TABLEAU_COLORS)]]
-                st.markdown(f"""
-                    <div style="background-color: {color}; border-radius: 10px; padding: 10px; margin-bottom: 10px; color: white;">
-                        <strong>{i}. {cat}</strong>: {count}
-                    </div>
-                """, unsafe_allow_html=True)
-
-            st.subheader("Category Distribution (Pie Chart) for CV Text Matching Job Description")
+            st.subheader("Category Distribution (Pie Chart)")
+            category_counts = df_categorized["category"].value_counts()
             fig, ax = plt.subplots()
-            colors = list(mcolors.TABLEAU_COLORS.values())[:len(df_cat)]
-            ax.pie(df_cat.values, labels=df_cat.index, colors=colors, autopct='%1.1f%%', startangle=90)
-            ax.axis('equal')
+            ax.pie(
+                category_counts.values,
+                labels=category_counts.index,
+                autopct="%1.1f%%",
+                startangle=90,
+            )
+            ax.axis("equal")
             st.pyplot(fig)
+
+            st.markdown("### Summary of CV Categories")
+            for i, (cat, count) in enumerate(category_counts.items(), start=1):
+                st.markdown(f"{i}. **{cat}**: {count}")
