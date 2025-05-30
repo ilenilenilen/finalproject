@@ -11,13 +11,12 @@ import matplotlib.colors as mcolors
 import nltk
 from nltk.tokenize.punkt import PunktSentenceTokenizer
 
-# Download punkt tokenizer if not available
+# Download 'punkt' tokenizer
 nltk.download('punkt', quiet=True)
 
-# Initialize Punkt tokenizer
+# Initialize the Punkt tokenizer
 tokenizer = PunktSentenceTokenizer()
 
-# Replace with your model directory path if needed
 MODEL_DIR = os.path.dirname(os.path.abspath(__file__))
 
 @st.cache_resource
@@ -29,7 +28,7 @@ def load_models():
         "SVM": joblib.load(os.path.join(MODEL_DIR, "svm_model.pkl")),
     }
 
-# Extract text from uploaded PDF file
+# Extract text from PDF
 def extract_text_from_pdf(file):
     try:
         pdf_reader = PyPDF2.PdfReader(file)
@@ -76,8 +75,9 @@ def categorize_sentences(text):
 
     return categorized_sentences
 
-# Streamlit App
-st.title("📄 CV Parsing with Manual Job Description Matching")
+
+# -------------------- STREAMLIT APP --------------------
+st.title("📄 CV Parsing with Job Description Matching")
 
 models = load_models()
 
@@ -92,9 +92,9 @@ if uploaded_file is not None:
     else:
         st.error("No text could be extracted from the uploaded file.")
 
-st.subheader("Job Description Input (Optional)")
-st.text_area("Enter Job Description (not used for matching, only reference):", height=150)
-st.text_area("Enter Job Qualifications:", height=150)
+st.subheader("Job Description Input (from HR)")
+job_desc = st.text_area("Enter Job Description (responsibilities, tasks, etc.):", height=150)
+job_qual = st.text_area("Enter Job Qualifications:", height=150)
 
 st.subheader("Text Input for Classification")
 text_for_classification = st.text_area(
@@ -105,7 +105,7 @@ text_for_classification = st.text_area(
 
 model_choice = st.selectbox("Choose a model:", list(models.keys()))
 
-if st.button("Predict and Categorize"):
+if st.button("Predict and Match"):
     if not text_for_classification.strip():
         st.warning("Please enter or select some CV text for classification.")
     else:
@@ -118,9 +118,9 @@ if st.button("Predict and Categorize"):
         if categorized:
             df_categorized = pd.DataFrame(categorized)
             df_categorized.index += 1
-            df_categorized["match_with_job_desc"] = False  # Manual match default
+            df_categorized["match_with_job_desc"] = False  # Manual default
 
-            st.subheader("CV Categorization Matching Job Description (Manual Matching)")
+            st.subheader("CV Categorization Matching Job Description (Manual Match)")
             edited_df = st.data_editor(
                 df_categorized,
                 use_container_width=True,
@@ -130,7 +130,6 @@ if st.button("Predict and Categorize"):
                 }
             )
 
-            # Summary only for matched rows
             matched_df = edited_df[edited_df["match_with_job_desc"] == True]
             df_cat = matched_df["category"].value_counts()
 
@@ -151,14 +150,13 @@ if st.button("Predict and Categorize"):
                 ax.axis('equal')
                 st.pyplot(fig)
 
-            # ✅ FIXED: Save Excel without calling `.save()`
+            # Download to Excel
             output = io.BytesIO()
             with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
-                edited_df.to_excel(writer, index=True, sheet_name="CV_Match")
-            output.seek(0)  # Move cursor to start of the stream
-
+                edited_df.to_excel(writer, sheet_name="CV_Match", index=True)
+                writer.save()
             st.download_button(
-                label="📥 Download Matched CV Data as Excel",
+                label="📥 Download CV Matching Result (Excel)",
                 data=output.getvalue(),
                 file_name="cv_match_result.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
