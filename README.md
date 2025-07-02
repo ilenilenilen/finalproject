@@ -60,7 +60,6 @@ You can adapt this based on your actual CSV or database structure.
 
 ## 📦 Requirements
 
-Your `requirements.txt` includes:
 pandas
 streamlit
 joblib
